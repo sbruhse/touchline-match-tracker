@@ -1,0 +1,49 @@
+# Tasks
+
+## 1. Confirm the architecture prerequisite
+
+- [x] 1.1 Confirm `align-app-with-fsd-architecture` has been implemented and its app-scoped match store, entity public API, feature/page boundaries, and colocated test entry points exist; verify its implementation status and delivered source paths before proceeding, and pause this change if that prerequisite is incomplete rather than duplicating the refactor.
+
+## 2. Extend match persistence and retain actual half durations
+
+- [x] 2.1 Add match-local squad snapshots, participation setup, substitution event/sequence types, and nullable completed-period durations to `entities/match`, with factory defaults and public exports; verify new matches start with no participation and no completed half durations and existing goal/score tests still pass.
+- [x] 2.2 Implement untagged/version-1 read normalization and per-record version-2 writes in the existing `touchline` IndexedDB database and `matches` object store without changing its schema version; retain the exact original v1 record once as `legacyV1Backup` in the upgraded record and preserve it on later saves, leaving legacy localStorage untouched. Add colocated literal IndexedDB fixtures for not-started, running, paused, half-time, and full-time records, unknown first-half duration in period two, mixed-version save/reload, lazy migration, retry idempotence, unsupported versions, and transaction-write failures; verify failed saves do not change reactive saved state.
+- [x] 2.3 Extend end-first-half, second-half-start, and full-time actions to persist actual period endpoints atomically with the clock; add clock/store integration cases proving 47-minute first-half retention, pause exclusion, final endpoint freezing, and exact running-anchor preservation after reload, and verify existing football-minute formatting is unchanged.
+- [x] 2.4 Document IndexedDB per-record versioning, lazy version-1 normalization, the same-record original backup, ignored legacy localStorage data, participation limitations, and rollback constraints in README; verify the database/object-store names, unchanged schema version, migration timing, and supported legacy behavior match the adapter and tests.
+
+## 3. Deliver the reusable player directory
+
+- [x] 3.1 Create `entities/player` model/API segments, versioned local persistence, stable IDs, and an app-scoped reactive store with public exports; add colocated tests for create/rename/reload, empty-name rejection, duplicate-name identities, archive/restore, and independent mounted stores, and verify each behavior persists correctly.
+- [x] 3.2 Add `features/manage-players`, `pages/my-players`, app-level navigation, and player-store initialization; verify through component integration tests that players can be created, renamed, archived, filtered/restored, and distinguished when names match without losing their IDs.
+- [x] 3.3 Document the My players workflow, local-only persistence, identity behavior, and archiving in README; verify the instructions against the delivered screen and accessible controls at a narrow viewport.
+
+## 4. Implement participation replay and playing-time calculations
+
+- [x] 4.1 Implement pure setup validation and ordered substitution replay within `entities/match`, including stable equal-time sequence and period-bound checks; add colocated tests for unique squads, nonempty starter subsets, invalid roles/players, unrestricted repeated re-entry, equal-time chained exchanges, half-time zero, and out-of-range times, and verify invalid candidates leave their input unchanged.
+- [x] 4.2 Implement interval-based totals and current/final lineup derivation from the same replay; verify the specification examples (35:00 repeated spells, 95:00 across actual half durations, half-time 47:00/10:00 split) with deterministic tests, plus paused time, unused bench, zero-length spells, millisecond summation before display rounding, and live/full-time endpoints.
+- [x] 4.3 Add candidate edit/removal validation with first-conflict reporting; verify tests cover a valid past-time correction, player correction, deletion of an independent event, rejected deletion/reordering that breaks later re-entry, and full-time recalculation without partial mutation.
+- [x] 4.4 Add pure cross-match aggregation by player ID; verify two-match time/appearance totals, one appearance for multiple spells, zero appearances for zero time, unused-bench breakdown entries, same-name distinct players, ongoing contribution flags, and exclusion of not-started/untracked matches.
+- [x] 4.5 Document elapsed-time versus ordinal match-minute semantics, half-time boundaries, replay order, and calculation examples near the domain API or in README; verify the examples agree with the tested values and no match entity imports the player entity.
+
+## 5. Deliver match setup, substitutions, and the live lineup
+
+- [x] 5.1 Add `features/configure-match-squad` using both entity public APIs and compose it on the match page; verify integration cases for home/away ownership, starter/bench selection, flexible squad size, preserved name snapshots, archived existing members, blank/duplicate setup errors, and setup locking at kickoff while goal-only matches remain usable.
+- [x] 5.2 Add `features/record-substitution` with captured-time drafts, OFF/ON selection, cancel, re-entry, and atomic validation/save; verify component tests for delayed selection preserving event time, stale drafts being rejected consistently, running/paused/half-time actions, and no draft event saved on cancel.
+- [x] 5.3 Add `features/edit-substitution` with half plus elapsed `mm:ss`/half-time editing and removal; verify valid changes persist after full-time, player-only edits preserve original millisecond timing, out-of-range times show errors, and a conflict in a later event prevents all candidate changes from being saved.
+- [x] 5.4 Display planned/current/final pitch and bench lists with accumulated time; verify deterministic integration tests for kickoff, repeated re-entry, pause, half-time exchanges, navigation/reload, and full-time labels, and verify no new live substitution can be started before kickoff or after full-time.
+- [x] 5.5 Extend the match page to a combined goal/substitution timeline with stable ties and clear event/team labels; verify goals still support immediate incomplete capture and editing, only goals affect score, half-time events appear at the correct boundary, and reload preserves equal-time substitution order.
+- [x] 5.6 Extend the colocated Firefox browser flow with directory creation, tracked squad selection, exchange out/back in, half-time exchange, and match reload, using deterministic saved-clock fixtures where needed; run `npm run test:e2e` and verify pitch membership, timing, and existing goal-only behavior through the UI.
+- [x] 5.7 Document pre-kickoff tracking setup, substitution capture/correction, setup locking, and one-for-one exchange limits in README; verify the documented sequence matches the UI and review keyboard labels, focus handling, and errors at desktop and narrow widths.
+
+## 6. Deliver player statistics and history navigation
+
+- [x] 6.1 Add `pages/player-statistics` combining both entity public APIs with summary totals and per-match opponent/date/side/status/time breakdowns; verify component cases for no history, unused bench, completed and live contributions, archived players, same-name identities, and unavailable data for untracked matches.
+- [x] 6.2 Wire directory-to-statistics and breakdown-to-match navigation through app events, and update totals reactively from persisted match changes; verify integration cases for rename preserving history, successful substitution corrections updating both views, live timer teardown on navigation, and reload retaining results.
+- [x] 6.3 Extend the browser flow to finish and reopen a tracked match, inspect player statistics, rename/archive a player, and verify historical membership and totals remain associated with that identity; run `npm run test:e2e` and confirm live time becomes fixed at full-time.
+- [x] 6.4 Document appearance counting, live contributions, per-match breakdowns, and inclusion/exclusion of stoppage time, manual pauses, and half-time breaks; verify the documented examples agree with both statistics and match views.
+
+## 7. Verify the integrated feature
+
+- [x] 7.1 Complete an FSD import/ownership audit across new and extended slices, including type-only imports, public entry points, absence of sibling-entity/feature/page imports, and test colocation; record the result and correct any boundary violations within this feature's scope. Audit result: 179 relative imports checked, no boundary violations; new tests are colocated.
+- [x] 7.2 Run final `npm test`, `npm run build`, and `npm run test:e2e` after all changes, reusing successful final-state runs when applicable; record results and confirm legacy IndexedDB version-1 reopen/edit migration and backup, untouched legacy localStorage, existing clock/goal flows, and the new participation/statistics scenarios pass together. Final verification: 28 Vitest files / 147 tests passed; production build passed; Firefox E2E 2/2 passed.
+- [x] 7.3 Review the complete directory-to-match-to-statistics workflow at desktop and narrow widths, including reload, invalid history edits, archived players, goal-only historical matches, and the 47-minute first-half example; record outcomes against the four specification deltas and verify local data and timing explanations are visible where relevant. Review outcome: desktop and 390px Firefox flows passed; reload, invalid correction, archived identity, goal-only history, 47:00 first-half timing, and final-time freeze are covered; README explains local persistence, while README and the statistics page explain elapsed-time boundaries.
