@@ -79,10 +79,12 @@ describe('MatchDetailPage', () => {
       expect(wrapper.get('#events-panel').isVisible()).toBe(true)
 
       const launcher = wrapper.get('[aria-label^="Add details for North City goal"]')
+      ;(launcher.element as HTMLButtonElement).focus()
       await launcher.trigger('click')
       setScorer('Unfinished page draft')
       document.querySelector<HTMLButtonElement>('.focused-editor__close')?.click()
       await flushPromises()
+      expect(document.activeElement).toBe(launcher.element)
 
       await wrapper.get('#player-times-tab').trigger('click')
       expect((wrapper.get('#player-times-tab').element as HTMLButtonElement).getAttribute('aria-selected')).toBe('true')
@@ -121,8 +123,9 @@ describe('MatchDetailPage', () => {
     const { wrapper, store } = await mountPage(fixtureMatch('goal-from-player-times', 'running'))
     try {
       await wrapper.get('#player-times-tab').trigger('click')
-      await wrapper.get('.match-action-area__goal:first-child .goal-button').trigger('click')
+      await wrapper.get('.match-action-area__inner > .goal-button:first-child .goal-button__team').trigger('click')
       await vi.waitFor(() => expect(store.matches.value[0].goals).toHaveLength(2))
+      expect(store.matches.value[0].goals[1].side).toBe('home')
       expect((wrapper.get('#player-times-tab').element as HTMLButtonElement).getAttribute('aria-selected')).toBe('true')
       expect(wrapper.get('.match-save-feedback').text()).toContain('Goal saved.')
       expect(document.querySelector('[role="dialog"]')).toBeNull()
@@ -193,9 +196,18 @@ describe('MatchDetailPage', () => {
       await flushPromises()
       expect(wrapper.get('.match-save-feedback').text()).toBe('All changes saved.')
 
-      await wrapper.get('[aria-label="Correct substitution Alex off for Sam"]').trigger('click')
+      const correctionLauncher = wrapper.get('[aria-label="Correct substitution Alex off for Sam"]')
+      ;(correctionLauncher.element as HTMLButtonElement).focus()
+      await correctionLauncher.trigger('click')
       expect(document.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Correct substitution')
       expect(wrapper.find('.match-save-feedback').exists()).toBe(false)
+      document.querySelector<HTMLButtonElement>('.cancel-correction-button')!.click()
+      await flushPromises()
+      expect(document.querySelector('[role="dialog"]')).toBeNull()
+      expect(document.activeElement).toBe(correctionLauncher.element)
+
+      await correctionLauncher.trigger('click')
+      expect(document.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Correct substitution')
       document.querySelector<HTMLButtonElement>('.remove-correction-button')!.click()
 
       await vi.waitFor(() => expect(store.matches.value[0].participation?.substitutions).toEqual([]))

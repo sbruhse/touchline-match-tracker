@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useMatchStore, type MatchSide } from '../../../entities/match'
+import { AppIcon } from '../../../shared/ui'
 import { recordMatchGoal } from '../model/recordMatchGoal'
 import type { CommittedGoalResult } from '../model/recordMatchGoal'
 
@@ -33,24 +34,36 @@ async function recordGoal(): Promise<void> {
     :disabled="!store.ready.value || store.saving.value"
     :aria-label="`Record goal for ${teamName}`"
     @click="recordGoal"
-  ><span aria-hidden="true">＋</span> Goal</button>
+  >
+    <span class="goal-button__action"><AppIcon name="plus" />Goal</span>
+    <span class="goal-button__team">{{ teamName }}</span>
+  </button>
 </template>
 
 <style scoped>
 .goal-button {
-  min-width: 6.5rem;
-  min-height: 2.35rem;
-  padding: 0 0.75rem;
-  border: 1px solid #dbe4d8;
-  border-radius: 0.35rem;
-  background: #f5f8f2;
-  color: var(--green);
+  width: 100%;
+  min-width: 0;
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid #cad7c7;
+  border-radius: 10px;
+  background: #edf3e8;
+  color: #204d38;
+  text-align: left;
   font-size: 0.75rem;
   font-weight: 700;
-  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
 }
 
-.goal-button:hover { transform: translateY(-1px); border-color: #a9bea7; background: #ebf2e6; }
+.goal-button:not(:disabled):hover { border-color: #9fb69d; background: #e2edda; }
+.goal-button:focus-visible { outline: 3px solid #5f8d2e; outline-offset: 2px; }
 .goal-button:disabled { cursor: not-allowed; opacity: 0.55; }
-.goal-button span { margin-right: 0.15rem; font-size: 0.9rem; }
+.goal-button__action { display: inline-flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+.goal-button__team { display: block; max-width: 100%; overflow-wrap: anywhere; font-size: 0.875rem; line-height: 1.2; }
 </style>

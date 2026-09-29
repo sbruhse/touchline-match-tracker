@@ -1,0 +1,50 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - link "Touchline match tracker home" [ref=e5] [cursor=pointer]:
+      - /url: "#"
+      - generic [ref=e8]: TOUCHLINE
+    - generic [ref=e9]: MATCH DAY, MADE SIMPLE
+    - navigation "Main navigation" [ref=e10]:
+      - button "Matches" [ref=e11] [cursor=pointer]
+      - button "My players" [ref=e12] [cursor=pointer]
+  - main [ref=e13]:
+    - generic [ref=e14]:
+      - region [ref=e15]:
+        - generic [ref=e16]:
+          - paragraph [ref=e17]: FOR THE LOVE OF THE GAME
+          - heading [level=1] [ref=e19]:
+            - text: Every moment,
+            - emphasis [ref=e20]: on the record.
+          - paragraph [ref=e21]: Your sideline companion for capturing the moments that make the match.
+        - generic [ref=e22]:
+          - generic [ref=e23]:
+            - generic [ref=e24]:
+              - paragraph [ref=e25]: THE NEXT 90
+              - heading "Set up a match" [level=2] [ref=e26]
+            - generic [aria-hidden] [ref=e27]: ＋
+          - generic [ref=e28]: Home team
+          - textbox "Home team" [ref=e29]:
+            - /placeholder: e.g. North City
+          - generic [ref=e30]: VS
+          - generic [ref=e32]: Away team
+          - textbox "Away team" [ref=e33]:
+            - /placeholder: e.g. South Town
+          - button "Create match" [disabled] [ref=e34]:
+            - text: Create match
+            - generic [aria-hidden] [ref=e35]: ↗
+          - paragraph [ref=e36]: No accounts. No setup. Just football.
+      - region [ref=e37]:
+        - generic [ref=e38]:
+          - generic [ref=e39]:
+            - paragraph [ref=e40]: YOUR TOUCHLINE
+            - heading "Match archive" [level=2] [ref=e41]
+          - generic [ref=e42]: 00 MATCHES
+        - generic [ref=e43]:
+          - generic [aria-hidden] [ref=e44]: ✳
+          - generic [ref=e45]:
+            - heading "No matches in the book yet." [level=3] [ref=e46]
+            - paragraph [ref=e47]: Your match history will find a home here.
+        - paragraph [ref=e48]: Matches stay in this browser profile. Clearing site data may remove them.
+  - contentinfo [ref=e49]:
+    - generic [ref=e50]: MADE FOR THE SIDELINE
+    - generic [ref=e51]: KEEP THE GAME CLOSE ✳

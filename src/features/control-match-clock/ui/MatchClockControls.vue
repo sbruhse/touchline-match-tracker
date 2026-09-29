@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useMatchStore } from '../../../entities/match'
+import { AppIcon } from '../../../shared/ui'
 import { applyMatchClockAction, type MatchClockAction } from '../model/controlMatchClock'
 
 const props = defineProps<{ matchId: string }>()
@@ -30,10 +31,10 @@ async function perform(action: MatchClockAction): Promise<void> {
       type="button"
       :disabled="!store.ready.value || store.saving.value"
       @click="perform('resume')"
-    >Start first half <span aria-hidden="true">▶</span></button>
+    ><AppIcon name="play" />Start first half</button>
     <template v-else-if="match.clock.status === 'running'">
       <button class="primary-button clock-primary" type="button" :disabled="!store.ready.value || store.saving.value" @click="perform('pause')">
-        Pause clock <span aria-hidden="true">Ⅱ</span>
+        <AppIcon name="pause" />Pause clock
       </button>
       <button
         v-if="match.clock.period === 1"
@@ -46,7 +47,7 @@ async function perform(action: MatchClockAction): Promise<void> {
     </template>
     <template v-else-if="match.clock.status === 'paused'">
       <button class="primary-button clock-primary" type="button" :disabled="!store.ready.value || store.saving.value" @click="perform('resume')">
-        Resume clock <span aria-hidden="true">▶</span>
+        <AppIcon name="play" />Resume clock
       </button>
       <button
         v-if="match.clock.period === 1"
@@ -63,7 +64,7 @@ async function perform(action: MatchClockAction): Promise<void> {
       type="button"
       :disabled="!store.ready.value || store.saving.value"
       @click="perform('start-second-half')"
-    >Start second half <span aria-hidden="true">▶</span></button>
+    ><AppIcon name="play" />Start second half</button>
     <p v-else class="full-time-message">The final whistle. Match complete.</p>
   </div>
 </template>
@@ -73,39 +74,40 @@ async function perform(action: MatchClockAction): Promise<void> {
 
 .primary-button {
   width: 100%;
-  min-height: 3rem;
+  min-height: 48px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 1rem;
-  border: 0;
-  border-radius: 0.35rem;
-  background: var(--green);
-  color: #fff;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid #cad7c7;
+  border-radius: 10px;
+  background: #edf3e8;
+  color: #204d38;
   font-size: 0.85rem;
   font-weight: 600;
-  transition: background 140ms ease, transform 140ms ease;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
 }
 
-.primary-button:not(:disabled):hover { transform: translateY(-1px); background: var(--green-dark); }
-.primary-button:disabled { cursor: not-allowed; opacity: 0.48; }
-.clock-primary { width: auto; min-width: 13rem; padding: 0 1.1rem; background: var(--lime); color: #1d3826; }
-.clock-primary:not(:disabled):hover { background: #e0f79a; }
+.primary-button:not(:disabled):hover { border-color: #9fb69d; background: #e2edda; }
+.primary-button:focus-visible, .secondary-button:focus-visible { outline: 3px solid #5f8d2e; outline-offset: 2px; }
+.primary-button:disabled { cursor: not-allowed; opacity: 0.55; }
+.clock-primary { width: auto; min-width: 0; }
 
 .secondary-button {
-  min-height: 3rem;
+  min-height: 48px;
   padding: 0 1rem;
-  border: 1px solid rgb(255 255 255 / 26%);
-  border-radius: 0.35rem;
-  background: transparent;
-  color: #f3f6ef;
+  border: 1px solid #cad7c7;
+  border-radius: 10px;
+  background: #fff;
+  color: #204d38;
   font-size: 0.8rem;
   font-weight: 600;
 }
 
-.secondary-button:hover { border-color: rgb(255 255 255 / 58%); background: rgb(255 255 255 / 7%); }
+.secondary-button:not(:disabled):hover { border-color: #9fb69d; background: #f4f8f1; }
 .secondary-button:disabled { cursor: not-allowed; opacity: 0.55; }
-.full-time-message { margin: 0.7rem 0 0.2rem; color: #e4eadf; font-size: 0.85rem; }
+.full-time-message { margin: 0.7rem 0 0.2rem; color: #526156; font-size: 0.85rem; }
 
 @media (max-width: 760px) {
   .clock-actions { flex-direction: column; }

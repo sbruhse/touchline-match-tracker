@@ -1,0 +1,93 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - link "Touchline match tracker home" [ref=e5] [cursor=pointer]:
+      - /url: "#"
+      - generic [ref=e8]: TOUCHLINE
+    - navigation "Main navigation" [ref=e10]:
+      - button "Matches" [ref=e11] [cursor=pointer]
+      - button "My players" [ref=e12] [cursor=pointer]
+  - main [ref=e13]:
+    - region [ref=e168]:
+      - generic [ref=e169]:
+        - generic [ref=e170]:
+          - generic [ref=e171]:
+            - button "Return to match archive" [ref=e172] [cursor=pointer]: ← Matches
+            - generic [ref=e173]: READY FOR KICKOFF
+          - generic "Match score" [ref=e174]:
+            - strong [ref=e175]: Riverside FC
+            - generic "Score" [ref=e176]:
+              - generic [ref=e177]: "0"
+              - generic [aria-hidden] [ref=e178]: –
+              - generic [ref=e179]: "0"
+            - strong [ref=e180]: Athletic United
+          - generic [ref=e181]:
+            - timer "Match time" [ref=e182]: 1′
+            - generic [ref=e183]: FIRST HALF
+            - generic "Match clock controls" [ref=e184]:
+              - button "Start first half" [ref=e185] [cursor=pointer]:
+                - text: Start first half
+                - generic [aria-hidden] [ref=e186]: ▶
+        - tablist "Match panels" [ref=e187]:
+          - tab "Events" [selected] [ref=e188] [cursor=pointer]
+          - tab "Player times" [ref=e189] [cursor=pointer]
+        - status [ref=e190]:
+          - generic [ref=e191]: All changes saved.
+      - generic [ref=e192]:
+        - region [ref=e193]:
+          - generic [ref=e195]:
+            - paragraph [ref=e196]: OPTIONAL MATCH TRACKING
+            - heading "Match squad" [level=2] [ref=e197]
+          - generic [ref=e221]:
+            - group "Which side is your team?" [ref=e222]:
+              - generic [ref=e224]:
+                - radio "Home · Riverside FC" [ref=e225]
+                - generic [ref=e226]: Home · Riverside FC
+              - generic [ref=e227]:
+                - radio "Away · Athletic United" [ref=e228]
+                - generic [ref=e229]: Away · Athletic United
+            - group "Select match squad players and starters" [ref=e230]:
+              - paragraph [ref=e232]: Squad size is flexible. Every starter must also be in the squad.
+              - generic [ref=e233]:
+                - generic [ref=e234]:
+                  - generic [ref=e235]:
+                    - checkbox "Include Alex Morgan in match squad" [ref=e236]
+                    - generic [ref=e237]: Alex Morgan
+                  - generic [ref=e238]:
+                    - checkbox "Select Alex Morgan as a starter" [disabled] [ref=e239]
+                    - generic [ref=e240]: Starter
+                - generic [ref=e241]:
+                  - generic [ref=e242]:
+                    - checkbox "Include Sam Taylor in match squad" [ref=e243]
+                    - generic [ref=e244]: Sam Taylor
+                  - generic [ref=e245]:
+                    - checkbox "Select Sam Taylor as a starter" [disabled] [ref=e246]
+                    - generic [ref=e247]: Starter
+                - generic [ref=e248]:
+                  - generic [ref=e249]:
+                    - checkbox "Include Jordan Wilson in match squad" [ref=e250]
+                    - generic [ref=e251]: Jordan Wilson
+                  - generic [ref=e252]:
+                    - checkbox "Select Jordan Wilson as a starter" [disabled] [ref=e253]
+                    - generic [ref=e254]: Starter
+            - generic [ref=e255]:
+              - button "Save match squad" [ref=e256] [cursor=pointer]
+              - button "Cancel" [ref=e257] [cursor=pointer]
+        - tabpanel "Events" [ref=e200]:
+          - region [ref=e201]:
+            - generic [ref=e202]:
+              - generic [ref=e203]:
+                - paragraph [ref=e204]: EVERY MOMENT
+                - heading "Match timeline" [level=2] [ref=e205]
+              - generic [ref=e206]: 00 GOALS · 00 EXCHANGES
+            - generic [ref=e207]:
+              - generic [aria-hidden] [ref=e208]: ○
+              - paragraph [ref=e209]: Goals and substitutions will appear here as the match unfolds.
+        - generic [ref=e210]:
+          - paragraph [ref=e211]: Changes are stored in this browser after each save completes.
+          - generic [ref=e212]: THIS DEVICE ONLY
+      - complementary "Match recording actions" [ref=e213]:
+        - generic [ref=e214]:
+          - generic "Riverside FC" [ref=e215]:
+            - button "Record goal for Riverside FC" [ref=e217] [cursor=pointer]: ＋ Goal
+          - generic "Athletic United" [ref=e218]:
+            - button "Record goal for Athletic United" [ref=e220] [cursor=pointer]: ＋ Goal

@@ -1,0 +1,86 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - link "Touchline match tracker home" [ref=e5] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e8]: TOUCHLINE
+      - navigation "Main navigation" [ref=e10]:
+        - button "Matches" [ref=e11] [cursor=pointer]
+        - button "My players" [ref=e12] [cursor=pointer]
+    - main [ref=e13]:
+      - region [ref=e56]:
+        - generic [ref=e57]:
+          - generic [ref=e58]:
+            - generic [ref=e59]:
+              - button "Return to match archive" [ref=e60] [cursor=pointer]: ← Matches
+              - generic [ref=e61]: CLOCK RUNNING
+            - generic "Match score" [ref=e62]:
+              - strong [ref=e63]: Riverside FC
+              - generic "Score" [ref=e64]:
+                - generic [ref=e65]: "1"
+                - generic [aria-hidden] [ref=e66]: –
+                - generic [ref=e67]: "0"
+              - strong [ref=e68]: Athletic United
+            - generic [ref=e69]:
+              - timer "Match time" [ref=e70]: 1′
+              - generic [ref=e71]: FIRST HALF
+              - generic "Match clock controls" [ref=e72]:
+                - button "Pause clock" [ref=e73] [cursor=pointer]:
+                  - text: Pause clock
+                  - generic [aria-hidden] [ref=e74]: Ⅱ
+                - button "Half-time" [ref=e75] [cursor=pointer]
+          - tablist "Match panels" [ref=e76]:
+            - tab "Events" [selected] [ref=e77] [cursor=pointer]
+            - tab "Player times" [ref=e78] [cursor=pointer]
+        - generic [ref=e79]:
+          - tabpanel "Events" [ref=e80]:
+            - region [ref=e81]:
+              - generic [ref=e82]:
+                - generic [ref=e83]:
+                  - paragraph [ref=e84]: EVERY MOMENT
+                  - heading "Match timeline" [level=2] [ref=e85]
+                - generic [ref=e86]: 01 GOALS · 00 EXCHANGES
+              - list "Goals and substitutions, newest first" [ref=e87]:
+                - listitem [ref=e88]:
+                  - generic [ref=e89]:
+                    - generic [ref=e90]:
+                      - generic [aria-hidden] [ref=e91]: ⚽
+                      - generic [ref=e92]: Goal
+                      - strong [ref=e93]: Riverside FC
+                    - time [ref=e94]: 1′
+                  - button "Add details for Riverside FC goal at 1′" [ref=e95] [cursor=pointer]: Add details
+          - generic [ref=e96]:
+            - paragraph [ref=e97]: Changes are stored in this browser after each save completes.
+            - generic [ref=e98]: THIS DEVICE ONLY
+        - complementary "Match recording actions" [ref=e99]:
+          - generic [ref=e100]:
+            - generic "Riverside FC" [ref=e101]:
+              - button "Record goal for Riverside FC" [ref=e103] [cursor=pointer]: ＋ Goal
+            - generic "Athletic United" [ref=e104]:
+              - button "Record goal for Athletic United" [ref=e106] [cursor=pointer]: ＋ Goal
+            - region "Match substitution" [ref=e108]:
+              - button "Substitute" [ref=e109] [cursor=pointer]
+  - dialog "Make a substitution" [ref=e111]:
+    - banner [ref=e112]:
+      - heading "Make a substitution" [level=2] [ref=e113]
+      - button "Close editor" [ref=e114] [cursor=pointer]: Close
+    - generic [ref=e116]:
+      - status [ref=e117]:
+        - text: "Captured occurrence time:"
+        - strong [ref=e118]: First half · 1′
+        - text: . Player selection will not change this time.
+      - generic [ref=e119]:
+        - group "Player off · on the pitch" [ref=e120]:
+          - generic [ref=e122]:
+            - radio "Alex Morgan" [checked] [active] [ref=e123]
+            - generic [ref=e124]: Alex Morgan
+          - generic [ref=e125]:
+            - radio "Sam Taylor" [ref=e126]
+            - generic [ref=e127]: Sam Taylor
+        - group "Player on · on the bench" [ref=e128]:
+          - generic [ref=e130]:
+            - radio "Jordan Wilson" [ref=e131]
+            - generic [ref=e132]: Jordan Wilson
+    - contentinfo [ref=e133]:
+      - button "Cancel" [ref=e134] [cursor=pointer]
+      - button "Save substitution" [disabled] [ref=e135]

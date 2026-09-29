@@ -1,0 +1,75 @@
+- generic [ref=f4e3]:
+  - banner [ref=f4e4]:
+    - link "Touchline match tracker home" [ref=f4e5] [cursor=pointer]:
+      - /url: "#"
+      - generic [ref=f4e8]: TOUCHLINE
+    - navigation "Main navigation" [ref=f4e10]:
+      - button "Matches" [ref=f4e11] [cursor=pointer]
+      - button "My players" [ref=f4e12] [cursor=pointer]
+  - main [ref=f4e13]:
+    - region [ref=f4e190]:
+      - generic [ref=f4e191]:
+        - generic [ref=f4e192]:
+          - generic [ref=f4e193]:
+            - button "Return to match archive" [ref=f4e194] [cursor=pointer]: Matches
+            - generic [ref=f4e197]: CLOCK RUNNING
+          - generic "Match score" [ref=f4e198]:
+            - strong [ref=f4e199]: North City
+            - generic "Score" [ref=f4e200]:
+              - generic [ref=f4e201]: "0"
+              - generic [aria-hidden] [ref=f4e202]: –
+              - generic [ref=f4e203]: "0"
+            - strong [ref=f4e204]: South Town
+          - generic [ref=f4e205]:
+            - timer "Match time" [ref=f4e206]: 2′
+            - generic [ref=f4e207]: FIRST HALF
+            - generic "Match clock controls" [ref=f4e208]:
+              - button "Pause clock" [ref=f4e291] [cursor=pointer]
+              - button "Half-time" [ref=f4e294] [cursor=pointer]
+        - tablist "Match panels" [ref=f4e212]:
+          - tab "Events" [ref=f4e213] [cursor=pointer]
+          - tab "Player times" [active] [selected] [ref=f4e214] [cursor=pointer]
+        - status [ref=f4e321]:
+          - generic [ref=f4e322]: All changes saved.
+      - generic [ref=f4e217]:
+        - tabpanel "Player times" [ref=f4e337]:
+          - region [ref=f4e338]:
+            - generic [ref=f4e339]:
+              - generic [ref=f4e340]:
+                - paragraph [ref=f4e341]: Player times for North City
+                - heading "Current lineup" [level=2] [ref=f4e342]
+              - generic [ref=f4e343]: LIVE
+            - timer "Player match times" [ref=f4e344]:
+              - region "On the pitch" [ref=f4e345]:
+                - generic [ref=f4e346]:
+                  - heading "On the pitch" [level=3] [ref=f4e347]
+                  - generic [ref=f4e348]: "01"
+                - list [ref=f4e349]:
+                  - listitem [ref=f4e350]:
+                    - generic [ref=f4e351]:
+                      - text: Sam Kerr
+                      - generic [ref=f4e352]: LIVE
+                    - time [ref=f4e353]: 01:00
+              - region "On the bench" [ref=f4e354]:
+                - generic [ref=f4e355]:
+                  - heading "On the bench" [level=3] [ref=f4e356]
+                  - generic [ref=f4e357]: "01"
+                - list [ref=f4e358]:
+                  - listitem [ref=f4e359]:
+                    - generic [ref=f4e360]:
+                      - text: Alex Morgan
+                      - generic [ref=f4e361]: LIVE
+                    - time [ref=f4e362]: 00:06
+        - generic [ref=f4e235]:
+          - paragraph [ref=f4e236]: Changes are stored in this browser after each save completes.
+          - generic [ref=f4e237]: THIS DEVICE ONLY
+      - complementary "Match recording actions" [ref=f4e238]:
+        - generic [ref=f4e239]:
+          - button "Record goal for North City" [ref=f4e240] [cursor=pointer]:
+            - generic [ref=f4e241]: Goal
+            - generic [ref=f4e244]: North City
+          - button "Record goal for South Town" [ref=f4e245] [cursor=pointer]:
+            - generic [ref=f4e246]: Goal
+            - generic [ref=f4e249]: South Town
+          - region "Match substitution" [ref=f4e296]:
+            - button "Substitute" [ref=f4e297] [cursor=pointer]

@@ -1,0 +1,43 @@
+- generic [ref=f4e3]:
+  - banner [ref=f4e4]:
+    - link "Touchline match tracker home" [ref=f4e5] [cursor=pointer]:
+      - /url: "#"
+      - generic [ref=f4e8]: TOUCHLINE
+    - generic [ref=f4e9]: MATCH DAY, MADE SIMPLE
+    - navigation "Main navigation" [ref=f4e10]:
+      - button "Matches" [ref=f4e11] [cursor=pointer]
+      - button "My players" [ref=f4e12] [cursor=pointer]
+  - main [ref=f4e13]:
+    - region [ref=f4e115]:
+      - generic [ref=f4e116]:
+        - generic [ref=f4e117]:
+          - paragraph [ref=f4e118]: YOUR SQUAD
+          - heading "My players" [level=2] [ref=f4e119]
+          - paragraph [ref=f4e120]: Keep your own player list in this browser and reuse it across matches.
+        - generic [ref=f4e121]: 2 PLAYERS
+      - generic [ref=f4e122]:
+        - generic [ref=f4e123]: Player name
+        - generic [ref=f4e124]:
+          - textbox "Player name" [ref=f4e125]:
+            - /placeholder: e.g. Alex Morgan
+          - button "Add player" [active] [ref=f4e126] [cursor=pointer]
+      - group "Filter players" [ref=f4e127]:
+        - button "Active" [pressed] [ref=f4e128] [cursor=pointer]
+        - button "Archived" [ref=f4e129] [cursor=pointer]
+      - list "Players" [ref=f4e136]:
+        - listitem [ref=f4e137]:
+          - strong [ref=f4e139]: Alex Morgan
+          - generic [ref=f4e140]:
+            - button "Rename Alex Morgan" [ref=f4e141] [cursor=pointer]: Rename
+            - button "Archive Alex Morgan" [ref=f4e142] [cursor=pointer]: Archive
+            - button "View statistics for Alex Morgan" [ref=f4e143] [cursor=pointer]: Statistics
+        - listitem [ref=f4e144]:
+          - strong [ref=f4e146]: Sam Kerr
+          - generic [ref=f4e147]:
+            - button "Rename Sam Kerr" [ref=f4e148] [cursor=pointer]: Rename
+            - button "Archive Sam Kerr" [ref=f4e149] [cursor=pointer]: Archive
+            - button "View statistics for Sam Kerr" [ref=f4e150] [cursor=pointer]: Statistics
+      - paragraph [ref=f4e132]: Player names and identities stay in this browser. Archiving keeps match history intact.
+  - contentinfo [ref=f4e133]:
+    - generic [ref=f4e134]: MADE FOR THE SIDELINE
+    - generic [ref=f4e135]: KEEP THE GAME CLOSE ✳

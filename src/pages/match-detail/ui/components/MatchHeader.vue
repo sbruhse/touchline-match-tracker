@@ -2,6 +2,7 @@
 import type { DeepReadonly } from 'vue'
 import type { Match } from '../../../../entities/match'
 import { MatchClockControls } from '../../../../features/control-match-clock'
+import { AppIcon } from '../../../../shared/ui'
 
 defineProps<{
   match: DeepReadonly<Match>
@@ -22,7 +23,8 @@ const emit = defineEmits<{
   <div class="match-header">
     <div class="match-header__topline">
       <button class="match-header__back back-button" type="button" aria-label="Return to match archive" @click="emit('back')">
-        <slot name="back-label">← Matches</slot>
+        <AppIcon name="arrow-left" />
+        <slot name="back-label">Matches</slot>
       </button>
       <span class="match-header__phase clock-status">{{ phase }}</span>
     </div>
@@ -46,7 +48,7 @@ const emit = defineEmits<{
 <style scoped>
 .match-header { padding: 10px 16px 12px; color: #17251d; background: #fff; }
 .match-header__topline { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.match-header__back { min-height: 44px; padding: 0 8px; color: #526156; background: transparent; border: 0; font: inherit; font-weight: 700; }
+.match-header__back { min-height: 48px; display: inline-flex; align-items: center; gap: 8px; padding: 0 8px; color: #526156; background: transparent; border: 0; font: inherit; font-weight: 700; }
 .match-header__phase, .match-header__clock-state { color: #526156; font-size: 0.875rem; }
 .match-header__scoreline { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; margin: 4px 0; }
 .match-header__team { overflow-wrap: anywhere; font-size: clamp(1rem, 4vw, 1.3rem); line-height: 1.15; }
@@ -56,8 +58,8 @@ const emit = defineEmits<{
 .match-header__clockline { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; }
 .match-header__minute { color: #204d38; font-family: 'Space Grotesk', sans-serif; font-size: 1.35rem; font-variant-numeric: tabular-nums; font-weight: 700; }
 .match-header :deep(.clock-actions) { flex: 1 1 auto; flex-direction: row; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.match-header :deep(.clock-primary), .match-header :deep(.secondary-button) { min-width: 0; min-height: 48px; width: auto; padding: 0 12px; color: #204d38; background: #edf3e8; border: 1px solid #cad7c7; border-radius: 10px; font-size: 0.9rem; }
-.match-header :deep(.full-time-message) { margin: 0; color: #526156; font-size: 0.9rem; }
+.match-header :deep(.clock-primary), .match-header :deep(.secondary-button) { font-size: 0.9rem; }
+.match-header :deep(.full-time-message) { margin: 0; font-size: 0.9rem; }
 
 @media (min-width: 680px) {
   .match-header { padding: 12px 22px; }

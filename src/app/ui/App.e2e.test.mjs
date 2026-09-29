@@ -249,7 +249,7 @@ test('creates, tracks, completes, finishes, and reopens a match', async () => {
       const welcome = document.querySelector('.welcome-panel').getBoundingClientRect()
       const copy = document.querySelector('.welcome-copy').getBoundingClientRect()
       const form = document.querySelector('.new-match-card').getBoundingClientRect()
-      return { width: window.innerWidth, sideBySide: form.left >= copy.right - 1, overflow: document.documentElement.scrollWidth > window.innerWidth, welcomeWidth: welcome.width }
+      return { width: window.innerWidth, sideBySide: form.left >= copy.right - 1, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1, welcomeWidth: welcome.width }
     })
     assert.ok(desktopArchive.width > 760, `Expected a desktop viewport, got ${desktopArchive.width}px.`)
     assert.ok(desktopArchive.sideBySide, 'The archive creation form should sit beside the welcome copy on desktop.')
@@ -259,7 +259,7 @@ test('creates, tracks, completes, finishes, and reopens a match', async () => {
     const narrowArchive = await driver.executeScript(() => {
       const copy = document.querySelector('.welcome-copy').getBoundingClientRect()
       const form = document.querySelector('.new-match-card').getBoundingClientRect()
-      return { width: window.innerWidth, stacked: form.top >= copy.bottom - 1, overflow: document.documentElement.scrollWidth > window.innerWidth }
+      return { width: window.innerWidth, stacked: form.top >= copy.bottom - 1, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1 }
     })
     assert.ok(narrowArchive.width <= 520, `Expected a narrow viewport, got ${narrowArchive.width}px.`)
     assert.ok(narrowArchive.stacked, 'The archive creation form should stack below the welcome copy on narrow screens.')
@@ -273,11 +273,11 @@ test('creates, tracks, completes, finishes, and reopens a match', async () => {
     await driver.manage().window().setRect({ x: 0, y: 0, width: 1280, height: 900 })
     const desktopDetail = await driver.executeScript(() => ({
       width: window.innerWidth,
-      overflow: document.documentElement.scrollWidth > window.innerWidth,
+      overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
       controlsDirection: getComputedStyle(document.querySelector('.clock-actions')).flexDirection,
       feedbackVisible: document.querySelector('.save-feedback')?.getBoundingClientRect().height > 0,
       feedbackOverflow: document.querySelector('.save-feedback')?.getBoundingClientRect().right > window.innerWidth,
-      recordingTeams: document.querySelectorAll('.match-action-area__goal').length,
+      recordingTeams: document.querySelectorAll('.match-action-area__inner > .goal-button').length,
     }))
     assert.ok(desktopDetail.width > 760, `Expected a desktop viewport, got ${desktopDetail.width}px.`)
     assert.ok(!desktopDetail.overflow, 'The detail view should not overflow horizontally on desktop.')
@@ -289,7 +289,7 @@ test('creates, tracks, completes, finishes, and reopens a match', async () => {
     await driver.manage().window().setRect({ x: 0, y: 0, width: 390, height: 844 })
     const narrowDetail = await driver.executeScript(() => ({
       width: window.innerWidth,
-      overflow: document.documentElement.scrollWidth > window.innerWidth,
+      overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
       controlsDirection: getComputedStyle(document.querySelector('.clock-actions')).flexDirection,
       feedbackVisible: document.querySelector('.save-feedback')?.getBoundingClientRect().height > 0,
       feedbackOverflow: document.querySelector('.save-feedback')?.getBoundingClientRect().right > window.innerWidth,
@@ -300,8 +300,8 @@ test('creates, tracks, completes, finishes, and reopens a match', async () => {
     assert.ok(narrowDetail.feedbackVisible, 'Committed-save feedback should be visible on narrow screens.')
     assert.ok(!narrowDetail.feedbackOverflow, 'Committed-save feedback should fit on narrow screens.')
 
-    const longHome = 'North City Football Club with an extremely long home team name'
-    const longAway = 'South Town Athletic Association with an extraordinarily long away team name'
+    const longHome = 'North City Athletic SupercalifragilisticexpialidociousHomeTeam'
+    const longAway = 'South Town United PneumonoultramicroscopicsilicovolcanoconiosisAwayTeam'
     await setSavedTeamNames(driver, 'North City', 'South Town', longHome, longAway)
     await driver.navigate().refresh()
     await click(driver, `[aria-label="Open ${longHome} versus ${longAway}"]`)
@@ -313,6 +313,36 @@ test('creates, tracks, completes, finishes, and reopens a match', async () => {
         const header = document.querySelector('.match-sticky-header').getBoundingClientRect()
         const actionArea = document.querySelector('.match-action-area').getBoundingClientRect()
         const targets = [...document.querySelectorAll('.match-panel-tabs button, .match-action-area button')]
+        const goalTiles = [...document.querySelectorAll('.match-action-area .goal-button')].map((button) => {
+          const buttonRect = button.getBoundingClientRect()
+          const team = button.querySelector('.goal-button__team')
+          const teamRange = document.createRange()
+          teamRange.selectNodeContents(team)
+          const teamLines = [...teamRange.getClientRects()].map((line) => ({
+            left: line.left,
+            right: line.right,
+            top: line.top,
+            bottom: line.bottom,
+          }))
+          const action = button.querySelector('.goal-button__action')
+          const iconRect = action.querySelector('svg').getBoundingClientRect()
+          const labelNode = [...action.childNodes].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim())
+          const labelRange = document.createRange()
+          labelRange.selectNodeContents(labelNode)
+          return {
+            width: buttonRect.width,
+            text: team.textContent.trim(),
+            teamFits: team.scrollWidth <= team.clientWidth + 1,
+            linesInsideButton: teamLines.every((line) => line.left >= buttonRect.left && line.right <= buttonRect.right && line.top >= buttonRect.top && line.bottom <= buttonRect.bottom),
+            iconGap: labelRange.getBoundingClientRect().left - iconRect.right,
+            cssGap: Number.parseFloat(getComputedStyle(action).columnGap),
+          }
+        })
+        const clockAction = document.querySelector('.clock-primary .app-icon')?.parentElement
+        const clockIconRect = clockAction?.querySelector('svg').getBoundingClientRect()
+        const clockLabelNode = [...(clockAction?.childNodes ?? [])].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim())
+        const clockLabelRange = document.createRange()
+        if (clockLabelNode) clockLabelRange.selectNodeContents(clockLabelNode)
         const goalButtonStyle = getComputedStyle(document.querySelector('.goal-button'))
         const selectedTabStyle = getComputedStyle(document.querySelector('.match-panel-tabs button[aria-selected="true"]'))
         const luminance = (color) => {
@@ -329,7 +359,7 @@ test('creates, tracks, completes, finishes, and reopens a match', async () => {
         return {
           width: window.innerWidth,
           viewportHeight: window.innerHeight,
-          overflow: document.documentElement.scrollWidth > window.innerWidth,
+          overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
           compactChrome: document.querySelector('.topbar--match').getBoundingClientRect().height <= 56,
           appFooterHidden: document.querySelector('.page-footer') === null,
           stickyTop: getComputedStyle(document.querySelector('.match-sticky-header')).position,
@@ -338,6 +368,9 @@ test('creates, tracks, completes, finishes, and reopens a match', async () => {
           actionBottom: actionArea.bottom,
           actionHeights: targets.map((target) => target.getBoundingClientRect().height),
           longNames: [...document.querySelectorAll('.match-header__team')].map((team) => team.textContent.trim()),
+          goalTiles,
+          clockIconGap: clockLabelNode && clockIconRect ? clockLabelRange.getBoundingClientRect().left - clockIconRect.right : 0,
+          clockCssGap: clockAction ? Number.parseFloat(getComputedStyle(clockAction).gap) : 0,
           goalContrast: contrast(goalButtonStyle.color, goalButtonStyle.backgroundColor),
           selectedTabContrast: contrast(selectedTabStyle.color, selectedTabStyle.backgroundColor),
         }
@@ -351,8 +384,13 @@ test('creates, tracks, completes, finishes, and reopens a match', async () => {
       assert.equal(workspace.actionPosition, 'fixed')
       assert.ok(Math.abs(workspace.actionBottom - workspace.viewportHeight) < 16,
          `Recording actions should stay at the viewport bottom (${workspace.actionBottom}/${workspace.viewportHeight}).`)
-      assert.ok(workspace.actionHeights.every((height) => height >= 48), 'Tabs and action buttons should have 48px touch targets.')
-      assert.deepEqual(workspace.longNames, [longHome, longAway])
+       assert.ok(workspace.actionHeights.every((height) => height >= 48), 'Tabs and action buttons should have 48px touch targets.')
+       assert.deepEqual(workspace.longNames, [longHome, longAway])
+       assert.deepEqual(workspace.goalTiles.map((tile) => tile.text), [longHome, longAway], 'Each whole goal button should contain its full team name.')
+       assert.ok(Math.abs(workspace.goalTiles[0].width - workspace.goalTiles[1].width) <= 1, 'Phone goal buttons should be equal width.')
+       assert.ok(workspace.goalTiles.every((tile) => tile.teamFits && tile.linesInsideButton), 'Every wrapped or unbroken team-name line should remain visible inside its button.')
+       assert.ok(workspace.goalTiles.every((tile) => tile.iconGap >= 6 && tile.cssGap >= 8), 'Goal icons should have visible separation from their labels.')
+       assert.ok(workspace.clockIconGap >= 6 && workspace.clockCssGap >= 8, 'Clock icons should have visible separation from their labels.')
       assert.ok(workspace.goalContrast >= 4.5, `Goal-button text contrast should be at least 4.5:1, got ${workspace.goalContrast}.`)
       assert.ok(workspace.selectedTabContrast >= 4.5, `Selected-tab contrast should be at least 4.5:1, got ${workspace.selectedTabContrast}.`)
       await driver.findElement(By.id('events-tab')).sendKeys(Key.ARROW_RIGHT)
@@ -547,15 +585,22 @@ test('creates, tracks, completes, finishes, and reopens a match', async () => {
         const header = document.querySelector('.match-sticky-header').getBoundingClientRect()
         const events = document.querySelectorAll('.timeline-event')
         const lastEvent = events[events.length - 1].getBoundingClientRect()
+        const firstEvent = events[0].getBoundingClientRect()
+        const eventAction = events[0].querySelector('.timeline-event-actions button').getBoundingClientRect()
         return {
           width: window.innerWidth,
           viewportHeight: window.innerHeight,
-          overflow: document.documentElement.scrollWidth > window.innerWidth,
+          overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
           actionBottom: actionArea.bottom,
           actionTop: actionArea.top,
           headerTop: header.top,
           lastEventTop: lastEvent.top,
           lastEventBottom: lastEvent.bottom,
+          eventActionInsets: {
+            left: eventAction.left - firstEvent.left,
+            right: firstEvent.right - eventAction.right,
+            bottom: firstEvent.bottom - eventAction.bottom,
+          },
           targetHeights: [...document.querySelectorAll('.match-panel-tabs button, .match-action-area button')]
             .map((target) => target.getBoundingClientRect().height),
         }
@@ -568,6 +613,8 @@ test('creates, tracks, completes, finishes, and reopens a match', async () => {
       assert.ok(bottomReachability.lastEventTop >= 0)
       assert.ok(bottomReachability.lastEventBottom <= bottomReachability.actionTop + 1,
         `The oldest event should be fully reachable above the recording actions at ${width}px.`)
+      assert.ok(Object.values(bottomReachability.eventActionInsets).every((inset) => inset >= 9),
+        `Event editor focus rings should fit inside their padded card actions at ${width}px.`)
       await closeViewportFrame(driver)
     }
 
@@ -582,7 +629,7 @@ test('creates, tracks, completes, finishes, and reopens a match', async () => {
         width: window.innerWidth,
         height: window.innerHeight,
         eventCount: events.length,
-        overflow: document.documentElement.scrollWidth > window.innerWidth,
+        overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
         headerTop: header.top,
         actionBottom: actions.bottom,
         actionTop: actions.top,
@@ -599,21 +646,21 @@ test('creates, tracks, completes, finishes, and reopens a match', async () => {
     await closeViewportFrame(driver)
 
     await openViewportFrame(driver, 320, '[aria-label="Open North City versus South Town"]')
-    await driver.wait(async () => await driver.findElements(By.css('.timeline-event')).then((events) => events.length >= 9), 10_000)
-    await driver.executeAsyncScript((done) => document.fonts.ready.then(() => requestAnimationFrame(() => done())))
-    const enlargedText = await driver.executeScript(() => {
-      document.documentElement.style.fontSize = '20px'
-      window.scrollTo(0, document.documentElement.scrollHeight)
-      const actionArea = document.querySelector('.match-action-area').getBoundingClientRect()
-      const events = document.querySelectorAll('.timeline-event')
-      const lastEvent = events[events.length - 1].getBoundingClientRect()
+      await driver.wait(async () => await driver.findElements(By.css('.timeline-event')).then((events) => events.length >= 9), 10_000)
+      await driver.executeAsyncScript((done) => document.fonts.ready.then(() => requestAnimationFrame(() => done())))
+      const enlargedText = await driver.executeScript(() => {
+        document.documentElement.style.fontSize = '20px'
+        window.scrollTo(0, document.documentElement.scrollHeight)
+        const actionArea = document.querySelector('.match-action-area').getBoundingClientRect()
+        const events = document.querySelectorAll('.timeline-event')
+        const lastEvent = events[events.length - 1].getBoundingClientRect()
       return {
         width: window.innerWidth,
         eventCount: events.length,
-        overflow: document.documentElement.scrollWidth > window.innerWidth,
+        overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
         actionBottom: actionArea.bottom,
-        actionTop: actionArea.top,
-        viewportHeight: window.innerHeight,
+          actionTop: actionArea.top,
+          viewportHeight: window.innerHeight,
         targetHeights: [...document.querySelectorAll('.match-panel-tabs button, .match-action-area button')]
           .map((target) => target.getBoundingClientRect().height),
         lastEventBottom: lastEvent.bottom,
@@ -623,8 +670,8 @@ test('creates, tracks, completes, finishes, and reopens a match', async () => {
     assert.ok(enlargedText.eventCount >= 9, 'The enlarged-text check should include the long event history.')
     assert.ok(!enlargedText.overflow, 'Enlarged text should not create horizontal Match-page scrolling.')
     assert.ok(Math.abs(enlargedText.actionBottom - enlargedText.viewportHeight) < 16)
-    assert.ok(enlargedText.targetHeights.every((height) => height >= 48))
-    assert.ok(enlargedText.lastEventBottom <= enlargedText.actionTop + 1)
+      assert.ok(enlargedText.targetHeights.every((height) => height >= 48))
+      assert.ok(enlargedText.lastEventBottom <= enlargedText.actionTop + 1)
     await closeViewportFrame(driver)
 
     await openViewportFrame(driver, 390, '[aria-label="Open North City versus South Town"]', 480)
@@ -702,7 +749,7 @@ test('tracks a squad through repeated and half-time exchanges, then restores its
     await driver.manage().window().setRect({ x: 0, y: 0, width: 390, height: 844 })
     const narrowForm = await driver.executeScript(() => ({
       width: window.innerWidth,
-      overflow: document.documentElement.scrollWidth > window.innerWidth,
+      overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
       columns: getComputedStyle(document.querySelector('.exchange-fields')).gridTemplateColumns.split(' ').length,
       dialogHeight: document.querySelector('.focused-editor').getBoundingClientRect().height,
       viewportHeight: window.innerHeight,
@@ -787,7 +834,7 @@ test('tracks a squad through repeated and half-time exchanges, then restores its
     await driver.manage().window().setRect({ x: 0, y: 0, width: 390, height: 844 })
     const narrowSquadForm = await driver.executeScript(() => ({
       width: window.innerWidth,
-      overflow: document.documentElement.scrollWidth > window.innerWidth,
+      overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
       widthPx: document.querySelector('.squad-form').getBoundingClientRect().width,
     }))
     assert.ok(narrowSquadForm.width <= 520, `Expected a narrow squad form, got ${narrowSquadForm.width}px.`)
@@ -834,6 +881,30 @@ test('tracks a squad through repeated and half-time exchanges, then restores its
     await recordExchange('Alex Morgan', 'Sam Kerr', alexId, samId)
     await assertLineup(samId, alexId)
     assert.equal(await driver.findElement(By.css(`[data-player-id="${alexId}"] .player-time`)).getText(), '18:00')
+    await openViewportFrame(driver, 390, '[aria-label="Open North City versus South Town"]')
+    await click(driver, '#player-times-tab')
+    const playerRowReachability = await driver.executeScript(() => {
+      document.documentElement.style.fontSize = '20px'
+      window.scrollTo(0, document.documentElement.scrollHeight)
+      const rows = document.querySelectorAll('.lineup-player')
+      const finalRow = rows[rows.length - 1].getBoundingClientRect()
+      const actions = document.querySelector('.match-action-area').getBoundingClientRect()
+      return {
+        width: window.innerWidth,
+        overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+        rowCount: rows.length,
+        finalRowBottom: finalRow.bottom,
+        actionTop: actions.top,
+      }
+    })
+    assert.equal(playerRowReachability.width, 390)
+    assert.ok(!playerRowReachability.overflow, 'Enlarged Player times should fit without horizontal scrolling.')
+    assert.ok(playerRowReachability.rowCount > 0)
+    assert.ok(playerRowReachability.finalRowBottom <= playerRowReachability.actionTop + 1,
+      'The final player row should be reachable above the expanded recording footer.')
+    await closeViewportFrame(driver)
+    await driver.executeScript(() => { document.documentElement.style.fontSize = '' })
+    await driver.manage().window().setRect({ x: 0, y: 0, width: 1280, height: 900 })
 
     await setSavedClock(driver, { period: 1, elapsedMs: 30 * 60_000, status: 'paused' })
     await reopenMatch()
@@ -975,7 +1046,7 @@ test('tracks a squad through repeated and half-time exchanges, then restores its
     await driver.manage().window().setRect({ x: 0, y: 0, width: 390, height: 844 })
     const narrowStatistics = await driver.executeScript(() => ({
       width: window.innerWidth,
-      overflow: document.documentElement.scrollWidth > window.innerWidth,
+      overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
       summaryColumns: getComputedStyle(document.querySelector('.statistics-summary')).gridTemplateColumns.split(' ').length,
       breakdownWidth: document.querySelector('.breakdown-row').getBoundingClientRect().width,
     }))

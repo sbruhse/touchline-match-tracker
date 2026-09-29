@@ -1,0 +1,62 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - link "Touchline match tracker home" [ref=e5] [cursor=pointer]:
+      - /url: "#"
+      - generic [ref=e8]: TOUCHLINE
+    - generic [ref=e9]: MATCH DAY, MADE SIMPLE
+    - navigation "Main navigation" [ref=e10]:
+      - button "Matches" [ref=e11] [cursor=pointer]
+      - button "My players" [ref=e12] [cursor=pointer]
+  - main [ref=e13]:
+    - region [ref=e52]:
+      - generic [ref=e53]:
+        - generic [ref=e54]:
+          - generic [ref=e55]:
+            - button "Return to match archive" [ref=e56] [cursor=pointer]: ← Matches
+            - generic [ref=e57]: READY FOR KICKOFF
+          - generic "Match score" [ref=e58]:
+            - strong [ref=e59]: Riverside FC
+            - generic "Score" [ref=e60]:
+              - generic [ref=e61]: "0"
+              - generic [aria-hidden] [ref=e62]: –
+              - generic [ref=e63]: "0"
+            - strong [ref=e64]: Athletic United
+          - generic [ref=e65]:
+            - timer "Match time" [ref=e66]: 1′
+            - generic [ref=e67]: FIRST HALF
+            - generic "Match clock controls" [ref=e68]:
+              - button "Start first half" [ref=e69] [cursor=pointer]:
+                - text: Start first half
+                - generic [aria-hidden] [ref=e70]: ▶
+        - tablist "Match panels" [ref=e71]:
+          - tab "Events" [selected] [ref=e72] [cursor=pointer]
+          - tab "Player times" [ref=e73] [cursor=pointer]
+        - status [ref=e74]:
+          - generic [ref=e75]: All changes saved.
+      - generic [ref=e76]:
+        - region [ref=e77]:
+          - generic [ref=e79]:
+            - paragraph [ref=e80]: OPTIONAL MATCH TRACKING
+            - heading "Match squad" [level=2] [ref=e81]
+          - paragraph [ref=e82]: Track your own side's players in this match. Your opponent does not need a player list.
+          - paragraph [ref=e83]: Add players in My players before configuring a tracked lineup.
+          - button "Set up player tracking" [ref=e84] [cursor=pointer]
+        - tabpanel "Events" [ref=e85]:
+          - region [ref=e86]:
+            - generic [ref=e87]:
+              - generic [ref=e88]:
+                - paragraph [ref=e89]: EVERY MOMENT
+                - heading "Match timeline" [level=2] [ref=e90]
+              - generic [ref=e91]: 00 GOALS · 00 EXCHANGES
+            - generic [ref=e92]:
+              - generic [aria-hidden] [ref=e93]: ○
+              - paragraph [ref=e94]: Goals and substitutions will appear here as the match unfolds.
+        - generic [ref=e95]:
+          - paragraph [ref=e96]: Changes are stored in this browser after each save completes.
+          - generic [ref=e97]: THIS DEVICE ONLY
+      - complementary "Match recording actions" [ref=e98]:
+        - generic [ref=e99]:
+          - generic "Riverside FC" [ref=e100]:
+            - button "Record goal for Riverside FC" [ref=e102] [cursor=pointer]: ＋ Goal
+          - generic "Athletic United" [ref=e103]:
+            - button "Record goal for Athletic United" [ref=e105] [cursor=pointer]: ＋ Goal

@@ -1,0 +1,53 @@
+- generic [ref=f4e3]:
+  - banner [ref=f4e4]:
+    - link "Touchline match tracker home" [ref=f4e5] [cursor=pointer]:
+      - /url: "#"
+      - generic [ref=f4e8]: TOUCHLINE
+    - generic [ref=f4e9]: MATCH DAY, MADE SIMPLE
+    - navigation "Main navigation" [ref=f4e10]:
+      - button "Matches" [active] [ref=f4e11] [cursor=pointer]
+      - button "My players" [ref=f4e12] [cursor=pointer]
+  - main [ref=f4e13]:
+    - generic [ref=f4e151]:
+      - region [ref=f4e152]:
+        - generic [ref=f4e153]:
+          - paragraph [ref=f4e154]: FOR THE LOVE OF THE GAME
+          - heading [level=1] [ref=f4e156]:
+            - text: Every moment,
+            - emphasis [ref=f4e157]: on the record.
+          - paragraph [ref=f4e158]: Your sideline companion for capturing the moments that make the match.
+        - generic [ref=f4e159]:
+          - generic [ref=f4e160]:
+            - generic [ref=f4e161]:
+              - paragraph [ref=f4e162]: THE NEXT 90
+              - heading "Set up a match" [level=2] [ref=f4e163]
+            - generic [aria-hidden] [ref=f4e164]: ＋
+          - generic [ref=f4e165]: Home team
+          - textbox "Home team" [ref=f4e166]:
+            - /placeholder: e.g. North City
+          - generic [ref=f4e167]: VS
+          - generic [ref=f4e169]: Away team
+          - textbox "Away team" [ref=f4e170]:
+            - /placeholder: e.g. South Town
+          - button "Create match" [disabled] [ref=f4e171]:
+            - text: Create match
+            - generic [aria-hidden] [ref=f4e172]: ↗
+          - paragraph [ref=f4e173]: No accounts. No setup. Just football.
+      - region [ref=f4e174]:
+        - generic [ref=f4e175]:
+          - generic [ref=f4e176]:
+            - paragraph [ref=f4e177]: YOUR TOUCHLINE
+            - heading "Match archive" [level=2] [ref=f4e178]
+          - generic [ref=f4e179]: 01 MATCH
+        - button "Open North City Athletic Supercalifragilistic versus South Town United Pneumonoultramicroscop" [ref=f4e181] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f4e182]: ●
+          - generic [ref=f4e183]:
+            - strong [ref=f4e184]: North City Athletic Supercalifragilistic
+            - generic [ref=f4e185]: vs
+            - strong [ref=f4e186]: South Town United Pneumonoultramicroscop
+          - generic [ref=f4e187]: Sep 27, 2026
+          - generic [aria-hidden] [ref=f4e188]: ↗
+        - paragraph [ref=f4e189]: Matches stay in this browser profile. Clearing site data may remove them.
+  - contentinfo [ref=f4e133]:
+    - generic [ref=f4e134]: MADE FOR THE SIDELINE
+    - generic [ref=f4e135]: KEEP THE GAME CLOSE ✳

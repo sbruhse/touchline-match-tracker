@@ -35,14 +35,8 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
 <template>
   <aside ref="actionBar" class="match-action-area" aria-label="Match recording actions">
     <div class="match-action-area__inner">
-      <div class="match-action-area__goal" :title="match.homeTeam">
-        <span class="match-action-area__team">{{ match.homeTeam }}</span>
-        <RecordGoalButton :match-id="match.id" side="home" :team-name="match.homeTeam" @recorded="emit('goalRecorded', $event)" />
-      </div>
-      <div class="match-action-area__goal" :title="match.awayTeam">
-        <span class="match-action-area__team">{{ match.awayTeam }}</span>
-        <RecordGoalButton :match-id="match.id" side="away" :team-name="match.awayTeam" @recorded="emit('goalRecorded', $event)" />
-      </div>
+      <RecordGoalButton :match-id="match.id" side="home" :team-name="match.homeTeam" @recorded="emit('goalRecorded', $event)" />
+      <RecordGoalButton :match-id="match.id" side="away" :team-name="match.awayTeam" @recorded="emit('goalRecorded', $event)" />
       <div v-if="canSubstitute" class="match-action-area__substitution">
         <RecordSubstitution
           :match-id="match.id"
@@ -69,17 +63,14 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
   backdrop-filter: blur(12px);
 }
 
-.match-action-area__inner { display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; gap: 8px; width: min(100%, 760px); margin: 0 auto; }
-.match-action-area__goal { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; min-width: 0; }
-.match-action-area__team { min-width: 0; overflow: hidden; color: #17251d; font-size: 0.875rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.match-action-area__goal :deep(.goal-button) { min-height: 48px; min-width: 76px; padding: 0 12px; color: #fff; background: #204d38; border: 0; border-radius: 10px; font-size: 0.9rem; }
+.match-action-area__inner { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; gap: 8px; width: min(100%, 760px); margin: 0 auto; }
+.match-action-area__inner > :deep(.goal-button) { min-width: 0; }
 .match-action-area__substitution { grid-column: 1 / -1; min-width: 0; }
-.match-action-area__substitution :deep(.record-substitution) { margin: 0; overflow: visible; border: 0; background: transparent; }
 .match-action-area__substitution :deep(.substitution-hint) { display: none; }
 
 @media (min-width: 680px) {
   .match-action-area { padding-right: 24px; padding-left: 24px; }
-  .match-action-area__inner { grid-template-columns: 1fr 1fr auto; align-items: center; }
+  .match-action-area__inner { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: stretch; }
   .match-action-area__substitution { grid-column: auto; min-width: 180px; }
   .match-action-area__substitution :deep(.start-substitution-button) { width: auto; padding: 0 20px; }
 }

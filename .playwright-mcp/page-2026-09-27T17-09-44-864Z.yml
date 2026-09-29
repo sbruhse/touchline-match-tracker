@@ -1,0 +1,87 @@
+- generic [ref=f4e3]:
+  - banner [ref=f4e4]:
+    - link "Touchline match tracker home" [ref=f4e5] [cursor=pointer]:
+      - /url: "#"
+      - generic [ref=f4e8]: TOUCHLINE
+    - generic [ref=f4e9]: MATCH DAY, MADE SIMPLE
+    - navigation "Main navigation" [ref=f4e10]:
+      - button "Matches" [ref=f4e11] [cursor=pointer]
+      - button "My players" [ref=f4e12] [cursor=pointer]
+  - main [ref=f4e13]:
+    - region [ref=f4e190]:
+      - generic [ref=f4e191]:
+        - generic [ref=f4e192]:
+          - generic [ref=f4e193]:
+            - button "Return to match archive" [ref=f4e194] [cursor=pointer]: Matches
+            - generic [ref=f4e197]: READY FOR KICKOFF
+          - generic "Match score" [ref=f4e198]:
+            - strong [ref=f4e199]: North City
+            - generic "Score" [ref=f4e200]:
+              - generic [ref=f4e201]: "0"
+              - generic [aria-hidden] [ref=f4e202]: –
+              - generic [ref=f4e203]: "0"
+            - strong [ref=f4e204]: South Town
+          - generic [ref=f4e205]:
+            - timer "Match time" [ref=f4e206]: 1′
+            - generic [ref=f4e207]: FIRST HALF
+            - generic "Match clock controls" [ref=f4e208]:
+              - button "Start first half" [ref=f4e209] [cursor=pointer]
+        - tablist "Match panels" [ref=f4e212]:
+          - tab "Events" [selected] [ref=f4e213] [cursor=pointer]
+          - tab "Player times" [ref=f4e214] [cursor=pointer]
+        - status [ref=f4e215]:
+          - generic [ref=f4e216]: All changes saved.
+      - generic [ref=f4e217]:
+        - region [ref=f4e218]:
+          - generic [ref=f4e220]:
+            - paragraph [ref=f4e221]: OPTIONAL MATCH TRACKING
+            - heading "Match squad" [level=2] [ref=f4e222]
+          - generic [ref=f4e250]:
+            - group "Which side is your team?" [ref=f4e251]:
+              - generic [ref=f4e253]:
+                - radio "Home · North City" [checked] [ref=f4e254]
+                - generic [ref=f4e255]: Home · North City
+              - generic [ref=f4e256]:
+                - radio "Away · South Town" [ref=f4e257]
+                - generic [ref=f4e258]: Away · South Town
+            - group "Select match squad players and starters" [ref=f4e259]:
+              - paragraph [ref=f4e261]: Squad size is flexible. Every starter must also be in the squad.
+              - generic [ref=f4e262]:
+                - generic [ref=f4e263]:
+                  - generic [ref=f4e264]:
+                    - checkbox "Include Alex Morgan in match squad" [checked] [ref=f4e265]
+                    - generic [ref=f4e266]: Alex Morgan
+                  - generic [ref=f4e267]:
+                    - checkbox "Select Alex Morgan as a starter" [ref=f4e268]
+                    - generic [ref=f4e269]: Starter
+                - generic [ref=f4e270]:
+                  - generic [ref=f4e271]:
+                    - checkbox "Include Sam Kerr in match squad" [checked] [active] [ref=f4e272]
+                    - generic [ref=f4e273]: Sam Kerr
+                  - generic [ref=f4e274]:
+                    - checkbox "Select Sam Kerr as a starter" [ref=f4e275]
+                    - generic [ref=f4e276]: Starter
+            - generic [ref=f4e277]:
+              - button "Save match squad" [ref=f4e278] [cursor=pointer]
+              - button "Cancel" [ref=f4e279] [cursor=pointer]
+        - tabpanel "Events" [ref=f4e225]:
+          - region [ref=f4e226]:
+            - generic [ref=f4e227]:
+              - generic [ref=f4e228]:
+                - paragraph [ref=f4e229]: EVERY MOMENT
+                - heading "Match timeline" [level=2] [ref=f4e230]
+              - generic [ref=f4e231]: 00 GOALS · 00 EXCHANGES
+            - generic [ref=f4e232]:
+              - generic [aria-hidden] [ref=f4e233]: ○
+              - paragraph [ref=f4e234]: Goals and substitutions will appear here as the match unfolds.
+        - generic [ref=f4e235]:
+          - paragraph [ref=f4e236]: Changes are stored in this browser after each save completes.
+          - generic [ref=f4e237]: THIS DEVICE ONLY
+      - complementary "Match recording actions" [ref=f4e238]:
+        - generic [ref=f4e239]:
+          - button "Record goal for North City" [ref=f4e240] [cursor=pointer]:
+            - generic [ref=f4e241]: Goal
+            - generic [ref=f4e244]: North City
+          - button "Record goal for South Town" [ref=f4e245] [cursor=pointer]:
+            - generic [ref=f4e246]: Goal
+            - generic [ref=f4e249]: South Town

@@ -1,0 +1,56 @@
+- generic [ref=f3e3]:
+  - banner [ref=f3e4]:
+    - link "Touchline match tracker home" [ref=f3e5] [cursor=pointer]:
+      - /url: "#"
+      - generic [ref=f3e8]: TOUCHLINE
+    - generic [ref=f3e112]: MATCH DAY, MADE SIMPLE
+    - navigation "Main navigation" [ref=f3e9]:
+      - button "Matches" [ref=f3e10] [cursor=pointer]
+      - button "My players" [ref=f3e11] [cursor=pointer]
+  - main [ref=f3e12]:
+    - region [ref=f3e51]:
+      - generic [ref=f3e52]:
+        - generic [ref=f3e53]:
+          - generic [ref=f3e54]:
+            - button "Return to match archive" [ref=f3e55] [cursor=pointer]: Matches
+            - generic [ref=f3e58]: CLOCK RUNNING
+          - generic "Match score" [ref=f3e59]:
+            - strong [ref=f3e60]: North City Athletic Supercalifragilistic
+            - generic "Score" [ref=f3e61]:
+              - generic [ref=f3e62]: "0"
+              - generic [aria-hidden] [ref=f3e63]: –
+              - generic [ref=f3e64]: "0"
+            - strong [ref=f3e65]: South Town United Pneumonoultramicroscop
+          - generic [ref=f3e66]:
+            - timer "Match time" [ref=f3e67]: 1′
+            - generic [ref=f3e68]: FIRST HALF
+            - generic "Match clock controls" [ref=f3e69]:
+              - button "Pause clock" [ref=f3e113] [cursor=pointer]
+              - button "Half-time" [ref=f3e116] [cursor=pointer]
+        - tablist "Match panels" [ref=f3e73]:
+          - tab "Events" [selected] [ref=f3e74] [cursor=pointer]
+          - tab "Player times" [ref=f3e75] [cursor=pointer]
+        - status [ref=f3e76]:
+          - generic [ref=f3e77]: All changes saved.
+      - generic [ref=f3e78]:
+        - tabpanel "Events" [ref=f3e87]:
+          - region [ref=f3e88]:
+            - generic [ref=f3e89]:
+              - generic [ref=f3e90]:
+                - paragraph [ref=f3e91]: EVERY MOMENT
+                - heading "Match timeline" [level=2] [ref=f3e92]
+              - generic [ref=f3e93]: 00 GOALS · 00 EXCHANGES
+            - generic [ref=f3e94]:
+              - generic [aria-hidden] [ref=f3e95]: ○
+              - paragraph [ref=f3e96]: Goals and substitutions will appear here as the match unfolds.
+        - generic [ref=f3e97]:
+          - paragraph [ref=f3e98]: Changes are stored in this browser after each save completes.
+          - generic [ref=f3e99]: THIS DEVICE ONLY
+      - complementary "Match recording actions" [ref=f3e100]:
+        - generic [ref=f3e101]:
+          - button "Record goal for North City Athletic Supercalifragilistic" [ref=f3e102] [cursor=pointer]:
+            - generic [ref=f3e103]: Goal
+            - generic [ref=f3e106]: North City Athletic Supercalifragilistic
+          - button "Record goal for South Town United Pneumonoultramicroscop" [ref=f3e107] [cursor=pointer]:
+            - generic [ref=f3e108]: Goal
+            - generic [ref=f3e111]: South Town United Pneumonoultramicroscop
