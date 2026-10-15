@@ -1,86 +1,184 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { createPlayer, renamePlayer, archivePlayer, restorePlayer, usePlayerStore } from '../../../entities/player'
+import { computed, ref, watch } from 'vue'
+import { createJerseySetIdentityLabels, useJerseySetStore } from '../../../entities/jersey-set'
+import type { PlayerSetNumberInput } from '../../../entities/jersey-set'
+import {
+  archivePlayer,
+  createPlayer,
+  createPlayerIdentityLabels,
+  restorePlayer,
+  updatePlayerProfile,
+  usePlayerStore,
+} from '../../../entities/player'
+import type { PlayerProfileInput } from '../../../entities/player'
+import PlayerDirectoryFilters from './components/PlayerDirectoryFilters.vue'
+import PlayerDirectoryList from './components/PlayerDirectoryList.vue'
+import PlayerProfileForm from './components/PlayerProfileForm.vue'
+import { parsePreferredNumberDraft } from '../lib/parsePreferredNumberDraft'
+import type { PlayerJerseyPreferenceDraft, SavedPlayerPreferredNumber } from './types'
 
 const store = usePlayerStore()
+const jerseyStore = useJerseySetStore()
 const emit = defineEmits<{ viewStatistics: [playerId: string] }>()
-const newName = ref('')
+const newProfile = ref<PlayerProfileInput>({ name: '', positions: [], jerseySize: '' })
 const localError = ref<string | null>(null)
 const showArchived = ref(false)
 const editingPlayerId = ref<string | null>(null)
-const editingName = ref('')
+const editingDraft = ref<PlayerProfileInput | null>(null)
+const editingPreferredNumbersPlayerId = ref<string | null>(null)
+const preferredNumberDraft = ref<PlayerJerseyPreferenceDraft[] | null>(null)
+const preferredNumberError = ref<string | null>(null)
+const preferredNumberErrorSetId = ref<string | null>(null)
+
+watch(editingPlayerId, (playerId, previousPlayerId) => {
+  if (playerId) {
+    const nameInput = document.getElementById(`edit-player-${playerId}-name`) as HTMLInputElement | null
+    nameInput?.focus({ preventScroll: true })
+    nameInput?.setSelectionRange(0, 0)
+    return
+  }
+  if (previousPlayerId) document.getElementById(`edit-profile-${previousPlayerId}`)?.focus()
+}, { flush: 'post' })
+
+watch(editingPreferredNumbersPlayerId, (playerId, previousPlayerId) => {
+  if (playerId) {
+    const firstSet = jerseyStore.sets.value[0]
+    const target = firstSet
+      ? document.getElementById(`preferred-player-${playerId}-${firstSet.id}`)
+      : document.getElementById(`preferred-player-${playerId}-cancel`)
+    target?.focus({ preventScroll: true })
+    return
+  }
+  if (previousPlayerId) document.getElementById(`edit-preferred-numbers-${previousPlayerId}`)?.focus()
+}, { flush: 'post' })
 
 const visiblePlayers = computed(() => store.players.value.filter((player) => player.archived === showArchived.value))
-const labels = computed(() => {
-  const groups = new Map<string, typeof store.players.value>()
-  for (const player of store.players.value) {
-    const key = player.name.trim().toLocaleLowerCase()
-    groups.set(key, [...(groups.get(key) ?? []), player])
-  }
-
-  const labelsById = new Map<string, string>()
-  for (const group of groups.values()) {
-    if (group.length === 1) {
-      labelsById.set(group[0].id, group[0].name)
-      continue
-    }
-
-    for (const player of group) {
-      const stableId = player.id.replace(/[^a-z0-9]/gi, '') || player.id
-      let length = Math.min(4, stableId.length)
-      while (length < stableId.length && group.some((other) =>
-        other.id !== player.id
-        && (other.id.replace(/[^a-z0-9]/gi, '') || other.id).slice(0, length).toLowerCase() === stableId.slice(0, length).toLowerCase(),
-      )) {
-        length += 1
-      }
-      labelsById.set(player.id, `${player.name} · ${stableId.slice(0, length)}`)
+const nameInvalid = computed(() => localError.value === 'A player name is required.')
+const labels = computed(() => createPlayerIdentityLabels(store.players.value))
+const preferredNumberSummaries = computed<ReadonlyMap<string, readonly SavedPlayerPreferredNumber[]>>(() => {
+  const summaries = new Map<string, SavedPlayerPreferredNumber[]>()
+  if (!jerseyStore.ready.value) return summaries
+  const setLabels = createJerseySetIdentityLabels(jerseyStore.sets.value)
+  for (const set of jerseyStore.sets.value) {
+    const label = setLabels.get(set.id) ?? set.name
+    for (const preference of set.preferredNumbers) {
+      const saved = summaries.get(preference.playerId) ?? []
+      saved.push({ setId: set.id, label, number: preference.number })
+      summaries.set(preference.playerId, saved)
     }
   }
-  return labelsById
+  return summaries
 })
 
-function labelFor(playerId: string): string {
-  return labels.value.get(playerId) ?? ''
-}
-
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Could not save player changes.'
+  return error instanceof Error ? error.message : 'Could not save changes.'
 }
 
 async function addPlayer(): Promise<void> {
   localError.value = null
   try {
-    await store.persist(createPlayer(newName.value))
-    newName.value = ''
+    await store.persist(createPlayer(newProfile.value))
+    newProfile.value = { name: '', positions: [], jerseySize: '' }
   } catch (error) {
     localError.value = errorMessage(error)
   }
 }
 
-function beginRename(playerId: string): void {
+function beginEdit(playerId: string): void {
   const player = store.players.value.find((item) => item.id === playerId)
   if (!player) return
+  closePreferredNumbersEdit()
   editingPlayerId.value = player.id
-  editingName.value = player.name
+  editingDraft.value = {
+    name: player.name,
+    positions: [...player.positions],
+    jerseySize: player.jerseySize ?? '',
+  }
   localError.value = null
 }
 
-function cancelRename(): void {
-  editingPlayerId.value = null
-  editingName.value = ''
-  localError.value = null
-}
-
-async function saveRename(playerId: string): Promise<void> {
+function beginEditPreferredNumbers(playerId: string): void {
   const player = store.players.value.find((item) => item.id === playerId)
-  if (!player) return
+  if (!player || !jerseyStore.ready.value || jerseyStore.loading.value || jerseyStore.saving.value) return
+  const setLabels = createJerseySetIdentityLabels(jerseyStore.sets.value)
+  editingPreferredNumbersPlayerId.value = player.id
+  editingPlayerId.value = null
+  editingDraft.value = null
+  preferredNumberDraft.value = jerseyStore.sets.value.map((set) => {
+    const preference = set.preferredNumbers.find((item) => item.playerId === player.id)
+    return {
+      setId: set.id,
+      label: setLabels.get(set.id) ?? set.name,
+      value: preference === undefined ? '' : String(preference.number),
+    }
+  })
+  preferredNumberError.value = null
+  preferredNumberErrorSetId.value = null
+  localError.value = null
+}
+
+function closePreferredNumbersEdit(): void {
+  editingPreferredNumbersPlayerId.value = null
+  preferredNumberDraft.value = null
+  preferredNumberError.value = null
+  preferredNumberErrorSetId.value = null
+}
+
+function cancelPreferredNumbersEdit(): void {
+  if (!editingPreferredNumbersPlayerId.value) return
+  closePreferredNumbersEdit()
+}
+
+function closeEdit(): void {
+  editingPlayerId.value = null
+  editingDraft.value = null
+  localError.value = null
+}
+
+function cancelEdit(): void {
+  if (!editingPlayerId.value) return
+  closeEdit()
+}
+
+async function saveProfile(playerId: string): Promise<void> {
+  const player = store.players.value.find((item) => item.id === playerId)
+  const profile = editingDraft.value
+  if (!player || !profile) return
   localError.value = null
   try {
-    await store.persist(renamePlayer(player, editingName.value))
-    cancelRename()
+    await store.persist(updatePlayerProfile(player, profile))
+    closeEdit()
   } catch (error) {
     localError.value = errorMessage(error)
+  }
+}
+
+async function savePreferredNumbers(playerId: string): Promise<void> {
+  const player = store.players.value.find((item) => item.id === playerId)
+  const draft = preferredNumberDraft.value
+  if (!player || !draft || !jerseyStore.ready.value) return
+
+  let errorSetId: string | null = null
+  let updates: PlayerSetNumberInput[]
+  try {
+    updates = draft.map((row) => {
+      errorSetId = row.setId
+      return { setId: row.setId, number: parsePreferredNumberDraft(row.value) }
+    })
+    errorSetId = null
+  } catch (error) {
+    preferredNumberError.value = errorMessage(error)
+    preferredNumberErrorSetId.value = errorSetId
+    return
+  }
+
+  preferredNumberError.value = null
+  preferredNumberErrorSetId.value = null
+  try {
+    await jerseyStore.updatePlayerNumbers(player.id, updates)
+    closePreferredNumbersEdit()
+  } catch (error) {
+    preferredNumberError.value = errorMessage(error)
   }
 }
 
@@ -101,6 +199,15 @@ async function retryLoad(): Promise<void> {
     await store.load()
   } catch {
     // The store retains the load error for the accessible retry state.
+  }
+}
+
+async function retryPreferredNumberLoad(): Promise<void> {
+  preferredNumberError.value = null
+  try {
+    await jerseyStore.load()
+  } catch {
+    // The directory remains usable; the unavailable preference state stays visible for retry.
   }
 }
 </script>
@@ -125,78 +232,64 @@ async function retryLoad(): Promise<void> {
       <button class="secondary-button" type="button" @click="retryLoad">Try again</button>
     </section>
     <template v-else>
-      <form class="player-create-form" @submit.prevent="addPlayer">
-        <label for="new-player-name">Player name</label>
-        <div class="create-player-row">
-          <input
-            id="new-player-name"
-            v-model="newName"
-            name="playerName"
-            maxlength="60"
-            autocomplete="off"
-            placeholder="e.g. Alex Morgan"
-            :disabled="store.saving.value"
-            :aria-invalid="localError === 'A player name is required.'"
-          />
-          <button class="primary-button" type="submit" :disabled="store.saving.value">Add player</button>
-        </div>
-      </form>
+      <PlayerProfileForm
+        :model-value="newProfile"
+        id-prefix="create-player"
+        mode="create"
+        :disabled="store.saving.value"
+        :name-invalid="nameInvalid"
+        @update:model-value="newProfile = $event"
+        @submit="addPlayer"
+      />
 
-      <div class="player-filter" role="group" aria-label="Filter players">
-        <button type="button" :aria-pressed="!showArchived" @click="showArchived = false">Active</button>
-        <button type="button" :aria-pressed="showArchived" @click="showArchived = true">Archived</button>
-      </div>
+      <PlayerDirectoryFilters
+        :model-value="showArchived"
+        :disabled="store.saving.value"
+        @update:model-value="showArchived = $event"
+      />
 
       <p v-if="localError || store.saveStatus.value === 'error'" class="player-error" role="alert" aria-live="assertive">
         {{ localError ?? store.error.value }}
       </p>
       <p v-else-if="store.saving.value" class="player-save-status" role="status" aria-live="polite">Saving player changes…</p>
 
-      <ul v-if="visiblePlayers.length" class="player-list" aria-label="Players">
-        <li v-for="player in visiblePlayers" :key="player.id" class="player-card" data-testid="player-card" :data-player-id="player.id">
-          <div v-if="editingPlayerId === player.id" class="player-edit-row">
-            <label class="visually-hidden" :for="`edit-player-${player.id}`">New name for {{ labelFor(player.id) }}</label>
-            <input
-              :id="`edit-player-${player.id}`"
-              v-model="editingName"
-              :disabled="store.saving.value"
-              maxlength="60"
-              autocomplete="off"
-            />
-            <button type="button" :disabled="store.saving.value" @click="saveRename(player.id)">Save name</button>
-            <button type="button" :disabled="store.saving.value" @click="cancelRename">Cancel</button>
-          </div>
-          <template v-else>
-            <div class="player-card-name">
-              <strong>{{ labelFor(player.id) }}</strong>
-              <span v-if="player.archived" class="archived-badge">Archived</span>
-            </div>
-            <div class="player-card-actions">
-              <button
-                type="button"
-                :disabled="store.saving.value"
-                :aria-label="`Rename ${labelFor(player.id)}`"
-                @click="beginRename(player.id)"
-              >Rename</button>
-              <button
-                type="button"
-                :disabled="store.saving.value"
-                :aria-label="`${player.archived ? 'Restore' : 'Archive'} ${labelFor(player.id)}`"
-                @click="changeArchived(player.id)"
-              >{{ player.archived ? 'Restore' : 'Archive' }}</button>
-              <button
-                type="button"
-                :aria-label="`View statistics for ${labelFor(player.id)}`"
-                @click="emit('viewStatistics', player.id)"
-              >Statistics</button>
-            </div>
-          </template>
-        </li>
-      </ul>
-      <div v-else class="empty-players">
-        <p>{{ showArchived ? 'No archived players.' : 'No players added yet.' }}</p>
-        <span v-if="!showArchived">Add your squad once and select them when setting up a match.</span>
-      </div>
+      <p v-if="jerseyStore.loading.value || (!jerseyStore.ready.value && !jerseyStore.error.value)" class="preference-storage-state" role="status" aria-live="polite">
+        Loading saved preferred numbers…
+      </p>
+      <section v-else-if="!jerseyStore.ready.value" class="preference-storage-error" role="alert">
+        <p>Saved preferred numbers are unavailable until the jersey sets load.</p>
+        <p>{{ jerseyStore.error.value }}</p>
+        <button class="secondary-button" type="button" :disabled="jerseyStore.loading.value" @click="retryPreferredNumberLoad">Try again</button>
+      </section>
+
+      <PlayerDirectoryList
+        :players="visiblePlayers"
+        :identity-labels="labels"
+        :preferred-number-summaries="preferredNumberSummaries"
+        :preferred-numbers-ready="jerseyStore.ready.value"
+        :has-preference-sets="jerseyStore.sets.value.length > 0"
+        :show-archived="showArchived"
+        :editing-player-id="editingPlayerId"
+        :editing-draft="editingDraft"
+        :editing-preferred-numbers-player-id="editingPreferredNumbersPlayerId"
+        :preferred-number-draft="preferredNumberDraft"
+        :preferred-number-disabled="jerseyStore.saving.value || jerseyStore.loading.value || !jerseyStore.ready.value"
+        :preferred-number-saving="jerseyStore.saving.value"
+        :preferred-number-error="preferredNumberError"
+        :preferred-number-error-set-id="preferredNumberErrorSetId"
+        :disabled="store.saving.value"
+        :name-invalid="nameInvalid"
+        @edit="beginEdit"
+        @update-draft="editingDraft = $event"
+        @save-profile="saveProfile"
+        @cancel-edit="cancelEdit"
+        @edit-preferred-numbers="beginEditPreferredNumbers"
+        @update-preferred-number-draft="preferredNumberDraft = $event"
+        @save-preferred-numbers="savePreferredNumbers"
+        @cancel-preferred-numbers="cancelPreferredNumbersEdit"
+        @change-archived="changeArchived"
+        @view-statistics="emit('viewStatistics', $event)"
+      />
       <p class="local-player-note">Player names and identities stay in this browser. Archiving keeps match history intact.</p>
     </template>
   </section>
@@ -209,43 +302,16 @@ async function retryLoad(): Promise<void> {
 .directory-heading h2 { margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 2rem; letter-spacing: -0.05em; }
 .directory-intro { margin: 0.6rem 0 0; color: #6d786f; font-size: 0.85rem; line-height: 1.55; }
 .player-count { padding-bottom: 0.25rem; color: #8b958c; font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.1em; white-space: nowrap; }
-.player-create-form { padding: 1.25rem; border: 1px solid #e4e8e1; border-radius: 0.55rem; background: var(--paper); }
-.player-create-form label { display: block; margin-bottom: 0.45rem; color: #49564d; font-size: 0.75rem; font-weight: 600; }
-.create-player-row { display: flex; gap: 0.65rem; }
-.create-player-row input, .player-edit-row input { min-width: 0; min-height: 2.8rem; flex: 1; padding: 0 0.75rem; border: 1px solid #dfe5dc; border-radius: 0.35rem; background: #fbfcfa; color: var(--ink); }
-.primary-button, .player-edit-row button { min-height: 2.8rem; padding: 0 1rem; border: 0; border-radius: 0.35rem; background: var(--green); color: #fff; font-size: 0.78rem; font-weight: 600; }
-.primary-button:disabled, .player-edit-row button:disabled, .player-card-actions button:disabled { cursor: not-allowed; opacity: 0.5; }
-.player-filter { display: flex; gap: 0.45rem; margin: 1.25rem 0 0.85rem; }
-.player-filter button { min-height: 2.3rem; padding: 0 0.85rem; border: 1px solid #dfe5dc; border-radius: 999px; background: transparent; color: #627066; font-size: 0.72rem; }
-.player-filter button[aria-pressed='true'] { border-color: var(--green); background: var(--green); color: #fff; }
-.player-error, .player-storage-error { padding: 0.75rem 0.9rem; border-radius: 0.35rem; background: #f8e9e6; color: #8a3d34; font-size: 0.78rem; }
-.player-save-status, .player-storage-state { color: #627267; font-size: 0.78rem; }
-.player-storage-error p { margin: 0 0 0.6rem; }
+.player-error, .player-storage-error, .preference-storage-error { padding: 0.75rem 0.9rem; border-radius: 0.35rem; background: #f8e9e6; color: #8a3d34; font-size: 0.78rem; }
+.player-save-status, .player-storage-state, .preference-storage-state { color: #627267; font-size: 0.78rem; }
+.player-storage-error p, .preference-storage-error p { margin: 0 0 0.6rem; }
 .secondary-button { min-height: 2.3rem; padding: 0 0.8rem; border: 1px solid #d1b0aa; border-radius: 0.35rem; background: transparent; color: #8a3d34; }
-.player-list { display: grid; gap: 0.55rem; margin: 0; padding: 0; list-style: none; }
-.player-card { min-height: 4rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.65rem 0.85rem; border: 1px solid #e4e8e1; border-radius: 0.45rem; background: rgb(255 255 255 / 78%); }
-.player-card-name { display: flex; align-items: center; gap: 0.6rem; min-width: 0; font-size: 0.85rem; }
-.archived-badge { padding: 0.18rem 0.4rem; border-radius: 999px; background: #eff1ed; color: #768076; font-size: 0.59rem; }
-.player-card-actions { display: flex; flex: 0 0 auto; gap: 0.4rem; }
-.player-card-actions button { min-height: 2.25rem; padding: 0 0.65rem; border: 1px solid #dfe5dc; border-radius: 0.3rem; background: transparent; color: #405748; font-size: 0.69rem; }
-.player-edit-row { width: 100%; display: flex; align-items: center; gap: 0.45rem; }
-.player-edit-row button:last-child { border: 1px solid #dfe5dc; background: transparent; color: #405748; }
-.empty-players { padding: 1.2rem 0; color: #69756b; font-size: 0.8rem; }
-.empty-players p { margin: 0 0 0.3rem; color: var(--ink); font-weight: 600; }
-.empty-players span, .local-player-note { color: #89928a; font-size: 0.68rem; line-height: 1.5; }
+.local-player-note { color: #89928a; font-size: 0.68rem; line-height: 1.5; }
 .local-player-note { margin: 1rem 0 0; }
-.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
 
 @media (max-width: 560px) {
   .player-directory { padding: 2.25rem 0 2.75rem; }
   .directory-heading { align-items: start; }
   .directory-heading h2 { font-size: 1.65rem; }
-  .create-player-row { flex-direction: column; }
-  .create-player-row .primary-button { width: 100%; }
-  .player-card { align-items: flex-start; flex-direction: column; }
-  .player-card-actions { width: 100%; }
-  .player-card-actions button { flex: 1; }
-  .player-edit-row { flex-wrap: wrap; }
-  .player-edit-row input { flex-basis: 100%; }
 }
 </style>

@@ -1,7 +1,9 @@
 import type { Player } from '../model/player'
+import { normalizePlayerJerseySize } from '../model/player'
+import { normalizePlayerPositions } from '../model/playerPositions'
 
 export const PLAYER_STORAGE_KEY = 'touchline.player-store'
-export const PLAYER_STORAGE_VERSION = 1
+export const PLAYER_STORAGE_VERSION = 3
 
 export interface PlayerRepository {
   listPlayers(): Promise<Player[]>
@@ -26,7 +28,7 @@ function asRecord(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>
 }
 
-function parsePlayer(value: unknown, index: number): Player {
+function parsePlayer(value: unknown, index: number, version: number): Player {
   const record = asRecord(value, `players[${index}]`)
   if (typeof record.id !== 'string' || !record.id.trim()) {
     throw new Error(`Invalid player storage: players[${index}].id is required.`)
@@ -41,18 +43,45 @@ function parsePlayer(value: unknown, index: number): Player {
     || typeof record.updatedAt !== 'number' || !Number.isFinite(record.updatedAt)) {
     throw new Error(`Invalid player storage: players[${index}] timestamps must be finite numbers.`)
   }
+  if (version >= 2 && !Object.hasOwn(record, 'positions')) {
+    throw new Error(`Invalid player storage: players[${index}].positions is required.`)
+  }
+  let positions: Player['positions']
+  try {
+    positions = Object.hasOwn(record, 'positions')
+      ? normalizePlayerPositions(record.positions)
+      : []
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'must be an array of known positions.'
+    throw new Error(`Invalid player storage: players[${index}].positions ${message}`)
+  }
+  if (version === 3 && !Object.hasOwn(record, 'jerseySize')) {
+    throw new Error(`Invalid player storage: players[${index}].jerseySize is required.`)
+  }
+  if (version === 3 && record.jerseySize !== null && typeof record.jerseySize !== 'string') {
+    throw new Error(`Invalid player storage: players[${index}].jerseySize must be text or null.`)
+  }
+  let jerseySize: string | null
+  try {
+    jerseySize = normalizePlayerJerseySize(record.jerseySize as string | null | undefined)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'must be text or null.'
+    throw new Error(`Invalid player storage: players[${index}].jerseySize ${message}`)
+  }
   return {
     id: record.id,
     name: record.name.trim(),
+    positions,
+    jerseySize,
     archived: record.archived,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   }
 }
 
-function parsePlayers(value: unknown): Player[] {
+function parsePlayers(value: unknown, version: number): Player[] {
   if (!Array.isArray(value)) throw new Error('Invalid player storage: players must be an array.')
-  const players = value.map(parsePlayer)
+  const players = value.map((player, index) => parsePlayer(player, index, version))
   const ids = new Set<string>()
   for (const player of players) {
     if (ids.has(player.id)) throw new Error(`Invalid player storage: duplicate player ID "${player.id}".`)
@@ -84,13 +113,13 @@ export function createPlayerRepository(options: PlayerRepositoryOptions = {}): P
         throw new Error('Saved player data is not valid JSON.', { cause: error })
       }
       const record = asRecord(envelope, 'root')
-      if (record.version !== PLAYER_STORAGE_VERSION) {
+      if (record.version !== 1 && record.version !== 2 && record.version !== PLAYER_STORAGE_VERSION) {
         throw new Error(`Unsupported player storage version: ${String(record.version)}.`)
       }
-      return parsePlayers(record.players)
+      return parsePlayers(record.players, record.version)
     },
     async savePlayers(players) {
-      const snapshot = parsePlayers(players)
+      const snapshot = parsePlayers(players, PLAYER_STORAGE_VERSION)
       storage().setItem(key, JSON.stringify({ version: PLAYER_STORAGE_VERSION, players: snapshot }))
     },
     close() {

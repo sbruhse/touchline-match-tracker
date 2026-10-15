@@ -2,7 +2,15 @@ import { mount } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { createPlayerRepository, type PlayerStorageLike } from '../api/playerStorage'
-import { archivePlayer, createPlayer, renamePlayer, restorePlayer, type Player } from './player'
+import {
+  archivePlayer,
+  createPlayer,
+  renamePlayer,
+  restorePlayer,
+  updatePlayerProfile,
+  type Player,
+} from './player'
+import type { PlayerPosition } from './playerPositions'
 import { createPlayerStore, providePlayerStore, usePlayerStore, type PlayerStore } from './playerStore'
 
 class MemoryStorage implements PlayerStorageLike {
@@ -64,6 +72,51 @@ describe('app-scoped player store', () => {
     await expect(store.persist({ ...first, name: '  ' })).rejects.toThrow('A player name is required.')
     expect(store.players.value).toEqual([first, second])
     expect((await createPlayerRepository({ storage }).listPlayers())).toEqual([first, second])
+  })
+
+  it('copies readonly position snapshots and preserves independent same-name profiles across saves', async () => {
+    const storage = new MemoryStorage()
+    const store = createPlayerStore(createPlayerRepository({ storage }))
+    await store.load()
+    const retainedPositions: PlayerPosition[] = ['DM', 'IV']
+    const readonlyPositions: readonly PlayerPosition[] = retainedPositions
+    const first = {
+      ...createPlayer({ name: 'Alex', positions: [], jerseySize: 'M' }, 100, 'alex-one'),
+      positions: readonlyPositions,
+    }
+    const second = createPlayer({ name: 'Alex', positions: ['ST'], jerseySize: 'L' }, 200, 'alex-two')
+
+    await store.persist(first)
+    await store.persist(second)
+    retainedPositions.push('TW')
+    expect(store.players.value.map(({ id, positions, jerseySize }) => ({ id, positions, jerseySize }))).toEqual([
+      { id: 'alex-one', positions: ['IV', 'DM'], jerseySize: 'M' },
+      { id: 'alex-two', positions: ['ST'], jerseySize: 'L' },
+    ])
+
+    const edited = updatePlayerProfile(store.players.value[0], { name: 'Alex Smith', positions: ['OM'] }, 300)
+    await store.persist(edited)
+    expect(store.players.value.map(({ id, positions, jerseySize }) => ({ id, positions, jerseySize }))).toEqual([
+      { id: 'alex-one', positions: ['OM'], jerseySize: 'M' },
+      { id: 'alex-two', positions: ['ST'], jerseySize: 'L' },
+    ])
+
+    const reloaded = createPlayerStore(createPlayerRepository({ storage }))
+    await reloaded.load()
+    expect(reloaded.players.value).toEqual(store.players.value)
+  })
+
+  it('rejects malformed positions without publishing or saving the invalid snapshot', async () => {
+    const storage = new MemoryStorage()
+    const store = createPlayerStore(createPlayerRepository({ storage }))
+    await store.load()
+    const saved = createPlayer({ name: 'Alex', positions: ['IV'] }, 100, 'alex-one')
+    await store.persist(saved)
+    const rawBefore = storage.getItem('touchline.player-store')
+
+    await expect(store.persist({ ...saved, positions: ['XYZ'] as never })).rejects.toThrow('Unknown player position')
+    expect(store.players.value).toEqual([saved])
+    expect(storage.getItem('touchline.player-store')).toBe(rawBefore)
   })
 
   it('provides isolated stores to independently mounted app roots', async () => {

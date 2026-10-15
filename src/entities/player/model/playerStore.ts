@@ -10,7 +10,8 @@ import {
 } from 'vue'
 import type { PlayerRepository } from '../api/playerStorage'
 import { createPlayerRepository } from '../api/playerStorage'
-import type { Player } from './player'
+import { normalizePlayerJerseySize, type Player } from './player'
+import { normalizePlayerPositions } from './playerPositions'
 
 export interface PlayerStore {
   players: DeepReadonly<Ref<Player[]>>
@@ -36,6 +37,8 @@ function plainPlayerSnapshot(player: DeepReadonly<Player>): Player {
   return {
     id: player.id,
     name,
+    positions: normalizePlayerPositions(player.positions),
+    jerseySize: normalizePlayerJerseySize(player.jerseySize),
     archived: player.archived,
     createdAt: player.createdAt,
     updatedAt: player.updatedAt,
