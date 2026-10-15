@@ -1,9 +1,16 @@
 <script setup lang="ts">
+import { onBeforeUnmount } from 'vue'
 import { useMatchStore } from '../../../entities/match'
 import { CreateMatchForm } from '../../../features/create-match'
 
-const emit = defineEmits<{ openMatch: [matchId: string] }>()
+const emit = defineEmits<{
+  matchCreated: [matchId: string]
+  openMatch: [matchId: string]
+  creationDraftChanged: [hasDraft: boolean]
+}>()
 const { matches } = useMatchStore()
+
+onBeforeUnmount(() => emit('creationDraftChanged', false))
 
 function formatDate(timestamp: number): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -29,7 +36,10 @@ function openMatch(matchId: string): void {
         </p>
       </div>
 
-      <CreateMatchForm @created="openMatch" />
+      <CreateMatchForm
+        @created="emit('matchCreated', $event)"
+        @draft-changed="emit('creationDraftChanged', $event)"
+      />
     </section>
 
     <section class="archive-section" aria-labelledby="archive-heading">

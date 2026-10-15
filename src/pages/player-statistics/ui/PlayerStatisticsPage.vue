@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import {
+  aggregatePlayerGoalStatistics,
   aggregatePlayerParticipation,
   useMatchStore,
   useMatchTime,
@@ -38,6 +39,9 @@ const displayName = computed(() => {
 })
 const statistics = computed(() => player.value
   ? aggregatePlayerParticipation(matchStore.matches.value, props.playerId, now.value)
+  : null)
+const goalStatistics = computed(() => player.value
+  ? aggregatePlayerGoalStatistics(matchStore.matches.value, props.playerId)
   : null)
 const untrackedMatches = computed(() => {
   const ids = new Set(statistics.value?.excludedMatches
@@ -85,6 +89,8 @@ const untrackedMatches = computed(() => {
       <PlayerStatisticsSummary
         :total-elapsed-ms="statistics.totalElapsedMs"
         :appearance-count="statistics.appearanceCount"
+        :goal-count="goalStatistics?.goalCount ?? 0"
+        :assist-count="goalStatistics?.assistCount ?? 0"
       />
       <PlayerMatchBreakdown
         :breakdowns="statistics.breakdowns"

@@ -10,6 +10,7 @@ import {
 } from 'vue'
 import { createMatchRepository, type MatchRepository } from '../api/matchStorage'
 import type { Match } from './match'
+import { copyMatchSnapshot } from './matchSnapshot'
 
 export interface MatchStore {
   matches: DeepReadonly<Ref<Match[]>>
@@ -24,30 +25,6 @@ export interface MatchStore {
 }
 
 const matchStoreKey: InjectionKey<MatchStore> = Symbol('match-store')
-
-function plainMatchSnapshot(match: DeepReadonly<Match>): Match {
-  return {
-    id: match.id,
-    homeTeam: match.homeTeam,
-    awayTeam: match.awayTeam,
-    createdAt: match.createdAt,
-    updatedAt: match.updatedAt,
-    clock: {
-      period: match.clock.period,
-      elapsedMs: match.clock.elapsedMs,
-      status: match.clock.status,
-      startedAt: match.clock.startedAt,
-    },
-    goals: match.goals.map((goal) => ({ ...goal })),
-    participation: match.participation ? {
-      ownSide: match.participation.ownSide,
-      squad: match.participation.squad.map((player) => ({ ...player })),
-      starterIds: [...match.participation.starterIds],
-      substitutions: match.participation.substitutions.map((event) => ({ ...event })),
-    } : null,
-    completedPeriodElapsedMs: { ...match.completedPeriodElapsedMs },
-  }
-}
 
 function messageFor(error: unknown): string {
   return error instanceof Error ? error.message : 'An unexpected storage error occurred.'
@@ -86,7 +63,7 @@ export function createMatchStore(repository: MatchRepository = createMatchReposi
     if (!ready.value || loading.value) throw new Error('Match store is not ready.')
     if (saving.value) throw new Error('Another match update is already being saved.')
 
-    const snapshot = plainMatchSnapshot(match)
+    const snapshot = copyMatchSnapshot(match)
     saving.value = true
     saveStatus.value = 'saving'
     error.value = null

@@ -26,6 +26,27 @@ function trackedMatch(
   }
 }
 
+function withAcceptedNumbers(match: Match, numbers: Record<string, number | null>): Match {
+  return {
+    ...match,
+    jerseyAssignment: {
+      setId: 'saved-set',
+      setNameSnapshot: 'Saved set',
+      rows: (match.participation?.squad ?? []).map(({ playerId }) => ({
+        playerId,
+        jersey: numbers[playerId] === null || numbers[playerId] === undefined
+          ? null
+          : {
+            jerseyId: `snapshot-${playerId}`,
+            number: numbers[playerId],
+            size: 'M',
+            ownerPlayerId: null,
+          },
+      })),
+    },
+  }
+}
+
 function sub(
   id: string,
   outgoingPlayerId: string,
@@ -79,16 +100,20 @@ describe('MatchLineupWidget', () => {
       starterIds: ['alex', 'sam'],
       substitutions: [],
     }
-    const { wrapper } = await mountWidget(trackedMatch(
+    const { wrapper } = await mountWidget(withAcceptedNumbers(trackedMatch(
       'planned-lineup',
       { period: 1, elapsedMs: 0, status: 'not-started', startedAt: null },
       participation,
-    ))
+    ), { alex: 0, sam: 12, jordan: null }))
     try {
       expect(wrapper.get('#match-lineup-heading').text()).toBe('Planned lineup')
       expect(wrapper.get('[aria-label="On the pitch"]').text()).toContain('Alex')
       expect(wrapper.get('[aria-label="On the pitch"]').text()).toContain('Sam')
       expect(wrapper.get('[aria-label="On the bench"]').text()).toContain('Jordan')
+      expect(wrapper.get('[data-player-id="alex"] .player-name').text().indexOf('#0'))
+        .toBeLessThan(wrapper.get('[data-player-id="alex"] .player-name').text().indexOf('Alex'))
+      expect(wrapper.get('[data-player-id="sam"] .player-name').text()).toContain('#12')
+      expect(wrapper.get('[data-player-id="jordan"] .unassigned-jersey').text()).toBe('No jersey assigned')
       expect(wrapper.get('[data-player-id="alex"] .player-time').text()).toBe('00:00')
       expect(wrapper.get('.lineup-live-badge').text()).toBe('READY')
     } finally {
@@ -119,6 +144,8 @@ describe('MatchLineupWidget', () => {
       expect(wrapper.get('[data-player-id="alex"] .player-time').text()).toBe('00:02')
       expect(wrapper.get('[data-player-id="alex"] .player-name').text()).toContain('LIVE')
       expect(wrapper.get('[data-player-id="sam"] .player-time').text()).toBe('00:00')
+      expect(wrapper.findAll('.unassigned-jersey')).toHaveLength(0)
+      expect(wrapper.findAll('.jersey-number')).toHaveLength(0)
 
       const current = store.matches.value[0]
       await store.persist({
@@ -150,17 +177,20 @@ describe('MatchLineupWidget', () => {
       starterIds: ['ongoing-player', 'early-player'],
       substitutions: [sub('early-off', 'early-player', 'late-player', 1, 1_000, 0)],
     }
-    const { wrapper } = await mountWidget(trackedMatch(
+    const { wrapper } = await mountWidget(withAcceptedNumbers(trackedMatch(
       'stable-long-player-rows',
       { period: 1, elapsedMs: 3_000, status: 'running', startedAt: 10_000 },
       participation,
-    ))
+    ), { 'late-player': 7, 'ongoing-player': 12, 'early-player': null }))
     try {
       const pitch = wrapper.get('[aria-label="On the pitch"]')
       const initialOrder = pitch.findAll('.lineup-player').map((row) => row.attributes('data-player-id'))
       expect(initialOrder).toEqual(['late-player', 'ongoing-player'])
       expect(pitch.text()).toContain(`${longName} · late`)
       expect(pitch.text()).toContain(`${longName} · ongo`)
+      expect(wrapper.get('[data-player-id="late-player"] .player-name').text()).toContain('#7')
+      expect(wrapper.get('[data-player-id="ongoing-player"] .player-name').text()).toContain('#12')
+      expect(wrapper.get('[data-player-id="early-player"] .unassigned-jersey').text()).toBe('No jersey assigned')
       expect(wrapper.get('.section-kicker').text()).toBe('Player times for North City')
       expect(wrapper.get('[data-player-id="late-player"] .player-time').text()).toBe('00:02')
       expect(wrapper.get('[data-player-id="ongoing-player"] .player-time').text()).toBe('00:03')
@@ -173,6 +203,8 @@ describe('MatchLineupWidget', () => {
         .toBe('ongoing-player')
       expect(wrapper.get('[data-player-id="late-player"] .player-time').text()).toBe('00:07')
       expect(wrapper.get('[data-player-id="ongoing-player"] .player-time').text()).toBe('00:08')
+      expect(wrapper.get('[data-player-id="late-player"] .player-name').text()).toContain('#7')
+      expect(wrapper.get('[data-player-id="ongoing-player"] .player-name').text()).toContain('#12')
     } finally {
       wrapper.unmount()
     }
@@ -188,15 +220,17 @@ describe('MatchLineupWidget', () => {
       starterIds: ['alex'],
       substitutions: [sub('halftime-swap', 'alex', 'sam', 2, 0, 1)],
     }
-    const { wrapper, store } = await mountWidget(trackedMatch(
+    const { wrapper, store } = await mountWidget(withAcceptedNumbers(trackedMatch(
       'halftime-lineup',
       { period: 1, elapsedMs: 47 * 60_000, status: 'halftime', startedAt: null },
       participation,
       { 1: 47 * 60_000, 2: null },
-    ))
+    ), { alex: 7, sam: 0 }))
     try {
       expect(wrapper.get('[aria-label="On the pitch"]').text()).toContain('Sam')
       expect(wrapper.get('[aria-label="On the bench"]').text()).toContain('Alex')
+      expect(wrapper.get('[data-player-id="sam"] .player-name').text()).toContain('#0')
+      expect(wrapper.get('[data-player-id="alex"] .player-name').text()).toContain('#7')
       expect(wrapper.get('[data-player-id="alex"] .player-time').text()).toBe('47:00')
       expect(wrapper.get('[data-player-id="sam"] .player-time').text()).toBe('00:00')
       expect(wrapper.text()).toContain('the break adds no playing time')
@@ -229,16 +263,20 @@ describe('MatchLineupWidget', () => {
         sub('alex-back', 'sam', 'alex', 1, 30 * 60_000, 2),
       ],
     }
-    const { wrapper } = await mountWidget(trackedMatch(
+    const { wrapper } = await mountWidget(withAcceptedNumbers(trackedMatch(
       'final-lineup',
       { period: 1, elapsedMs: 47 * 60_000, status: 'full-time', startedAt: null },
       participation,
       { 1: 47 * 60_000, 2: null },
-    ))
+    ), { alex: 0, sam: 12 }))
     try {
       expect(wrapper.get('#match-lineup-heading').text()).toBe('Final lineup')
+      expect(wrapper.get('[aria-label="On the pitch"]').text()).toContain('Alex')
+      expect(wrapper.get('[aria-label="On the bench"]').text()).toContain('Sam')
       expect(wrapper.get('[data-player-id="alex"] .player-time').text()).toBe('35:00')
       expect(wrapper.get('[data-player-id="sam"] .player-time').text()).toBe('12:00')
+      expect(wrapper.get('[data-player-id="alex"] .player-name').text()).toContain('#0')
+      expect(wrapper.get('[data-player-id="sam"] .player-name').text()).toContain('#12')
       expect(wrapper.get('[data-player-id="alex"] .player-name').text()).not.toContain('LIVE')
     } finally {
       wrapper.unmount()

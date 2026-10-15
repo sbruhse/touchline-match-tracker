@@ -8,6 +8,7 @@ import {
   type MatchPeriod,
   type SubstitutionEvent,
   validateSubstitutionHistoryCandidate,
+  copyMatchSnapshot,
 } from '../../../entities/match'
 
 export interface SubstitutionOccurrence {
@@ -140,17 +141,9 @@ export function buildSubstitutionCandidate(
     starterIds: [...match.participation.starterIds],
     substitutions: validation.events,
   }
-  const nextMatch: Match = {
-    id: match.id,
-    homeTeam: match.homeTeam,
-    awayTeam: match.awayTeam,
-    createdAt: match.createdAt,
-    updatedAt: now,
-    clock: { ...match.clock },
-    goals: match.goals.map((goal) => ({ ...goal })),
-    participation: nextParticipation,
-    completedPeriodElapsedMs: { ...match.completedPeriodElapsedMs },
-  }
+  const nextMatch = copyMatchSnapshot(match)
+  nextMatch.updatedAt = now
+  nextMatch.participation = nextParticipation
   return { valid: true, match: nextMatch, event }
 }
 

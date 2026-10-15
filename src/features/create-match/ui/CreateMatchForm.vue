@@ -1,21 +1,27 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useMatchStore } from '../../../entities/match'
 import { createAndSaveMatch } from '../model/createAndSaveMatch'
 
 const emit = defineEmits<{
   created: [matchId: string]
+  draftChanged: [hasDraft: boolean]
 }>()
 
 const store = useMatchStore()
 const homeTeam = ref('')
 const awayTeam = ref('')
 
+watch([homeTeam, awayTeam], () => {
+  emit('draftChanged', homeTeam.value.length > 0 || awayTeam.value.length > 0)
+}, { immediate: true })
+
 async function submit(): Promise<void> {
   try {
     const matchId = await createAndSaveMatch(homeTeam.value, awayTeam.value, store)
     homeTeam.value = ''
     awayTeam.value = ''
+    emit('draftChanged', false)
     emit('created', matchId)
   } catch {
     // Keep both team names available for the user's retry.
@@ -64,9 +70,9 @@ async function submit(): Promise<void> {
       type="submit"
       :disabled="!store.ready.value || store.saving.value || !homeTeam.trim() || !awayTeam.trim()"
     >
-      Create match <span aria-hidden="true">↗</span>
+      Create match and prepare <span aria-hidden="true">↗</span>
     </button>
-    <p class="form-note">No accounts. No setup. Just football.</p>
+    <p class="form-note">Squad and jerseys are optional after creation. You can skip both; kickoff stays a separate action.</p>
   </form>
 </template>
 

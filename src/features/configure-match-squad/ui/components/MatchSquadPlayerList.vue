@@ -55,14 +55,14 @@ function checked(event: Event): boolean {
 
 <style scoped>
 .player-choice-items { display: grid; gap: 0.4rem; }
-.player-choice { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; min-height: 2.8rem; padding: 0.4rem 0.6rem; border: 1px solid #e5e9e2; border-radius: 0.35rem; background: #fff; }
-.squad-player-label, .starter-choice { display: flex; align-items: center; gap: 0.45rem; color: #425247; font-size: 0.72rem; }
+.player-choice { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; min-height: 3rem; padding: 0.45rem 0.65rem; border: 1px solid #e4e8e0; border-radius: 0.35rem; background: #fff; }
+.squad-player-label, .starter-choice { display: flex; align-items: center; gap: 0.5rem; color: #33483a; font-size: 0.92rem; }
 .squad-player-label { min-width: 0; }
 .squad-player-label input, .starter-choice input { accent-color: var(--green); }
 .squad-player-label span { overflow-wrap: anywhere; }
-.squad-player-label small { color: #8a7660; font-size: 0.62rem; }
-.starter-choice { flex: 0 0 auto; color: #69766c; }
-.no-directory-players { color: #7b867d; font-size: 0.73rem; }
+.squad-player-label small { color: #6b5844; font-size: 0.78rem; }
+.starter-choice { flex: 0 0 auto; color: #526156; }
+.no-directory-players { color: #526156; font-size: 0.9rem; }
 
 @media (max-width: 520px) {
   .player-choice { align-items: flex-start; }

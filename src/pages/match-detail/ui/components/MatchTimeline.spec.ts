@@ -50,27 +50,27 @@ function fixtureMatch(): Match {
     goals: [
       {
         id: 'late-goal', side: 'away', period: 1, elapsedMs: 35_000,
-        scorer: '', assist: '', description: '', createdAt: 200,
+        scorerPlayerId: null, scorer: '', assistPlayerId: null, assist: '', description: '', createdAt: 200,
       },
       {
         id: 'stoppage-goal', side: 'away', period: 1, elapsedMs: 47 * 60_000,
-        scorer: '', assist: '', description: '', createdAt: 250,
+        scorerPlayerId: null, scorer: '', assistPlayerId: null, assist: '', description: '', createdAt: 250,
       },
       {
         id: 'second-half-goal', side: 'home', period: 2, elapsedMs: 60_000,
-        scorer: 'Jordan', assist: '', description: '', createdAt: 300,
+        scorerPlayerId: null, scorer: 'Jordan', assistPlayerId: null, assist: '', description: '', createdAt: 300,
       },
       {
         id: 'earlier-tied-goal', side: 'away', period: 1, elapsedMs: 20_000,
-        scorer: '', assist: '', description: '', createdAt: 140,
+        scorerPlayerId: null, scorer: '', assistPlayerId: null, assist: '', description: '', createdAt: 140,
       },
       {
         id: 'tied-goal', side: 'home', period: 1, elapsedMs: 20_000,
-        scorer: '', assist: '', description: '', createdAt: 150,
+        scorerPlayerId: null, scorer: '', assistPlayerId: null, assist: '', description: '', createdAt: 150,
       },
       {
         id: 'opening-goal', side: 'home', period: 1, elapsedMs: 10_000,
-        scorer: '', assist: '', description: '', createdAt: 100,
+        scorerPlayerId: null, scorer: '', assistPlayerId: null, assist: '', description: '', createdAt: 100,
       },
     ],
   }

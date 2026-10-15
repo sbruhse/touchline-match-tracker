@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createMatch,
   provideMatchStore,
+  type GoalEvent,
   type Match,
   type MatchParticipation,
   type MatchRepository,
@@ -40,6 +41,7 @@ function trackedMatch(
     completed?: Match['completedPeriodElapsedMs']
     homeTeam?: string
     awayTeam?: string
+    goals?: GoalEvent[]
   } = {},
 ): Match {
   return {
@@ -47,6 +49,29 @@ function trackedMatch(
     clock: options.clock ?? { period: 1, elapsedMs: 47 * 60_000, status: 'full-time', startedAt: null },
     participation,
     completedPeriodElapsedMs: options.completed ?? { 1: 47 * 60_000, 2: null },
+    goals: options.goals ?? [],
+  }
+}
+
+function goalEvent(
+  id: string,
+  scorerPlayerId: string | null,
+  assistPlayerId: string | null,
+  side: 'home' | 'away' = 'home',
+  scorer = '',
+  assist = '',
+): GoalEvent {
+  return {
+    id,
+    side,
+    period: 1,
+    elapsedMs: 10_000,
+    scorerPlayerId,
+    scorer,
+    assistPlayerId,
+    assist,
+    description: '',
+    createdAt: 1,
   }
 }
 
@@ -118,8 +143,11 @@ describe('PlayerStatisticsPage', () => {
       expect(wrapper.get('#player-statistics-heading').text()).toBe('Alex Morgan')
       expect(wrapper.get('[data-testid="total-playing-time"]').text()).toBe('00:00')
       expect(wrapper.get('[data-testid="appearance-count"]').text()).toBe('0')
+      expect(wrapper.get('[data-testid="goal-count"]').text()).toBe('0')
+      expect(wrapper.get('[data-testid="assist-count"]').text()).toBe('0')
       expect(wrapper.get('[data-testid="empty-player-history"]').text()).toContain('No recorded playing time yet.')
       expect(wrapper.get('.statistics-time-note').text()).toContain('excludes manual pauses and the half-time break')
+      expect(wrapper.get('.statistics-goal-note').text()).toContain('Name-only goals and unstarted matches are excluded')
       expect(wrapper.find('.breakdown-row').exists()).toBe(false)
     } finally {
       wrapper.unmount()
@@ -139,6 +167,7 @@ describe('PlayerStatisticsPage', () => {
         homeTeam: 'Valley United',
         awayTeam: 'North City',
         completed: { 1: 47 * 60_000, 2: null },
+        goals: [goalEvent('archived-bench-goal', archivedSam.id, null, 'away', 'Sam match snapshot')],
       },
     )
     const page = await mountStatistics(archivedSam.id, [alex, archivedSam], [match])
@@ -147,6 +176,8 @@ describe('PlayerStatisticsPage', () => {
       expect(wrapper.get('.archived-label').text()).toContain('ARCHIVED PLAYER')
       expect(wrapper.get('[data-testid="total-playing-time"]').text()).toBe('00:00')
       expect(wrapper.get('[data-testid="appearance-count"]').text()).toBe('0')
+      expect(wrapper.get('[data-testid="goal-count"]').text()).toBe('1')
+      expect(wrapper.get('[data-testid="assist-count"]').text()).toBe('0')
       const row = wrapper.get('[data-match-id="unused-bench-match"]')
       expect(row.text()).toContain('vs Valley United')
       expect(row.text()).toContain('AWAY')
@@ -171,6 +202,7 @@ describe('PlayerStatisticsPage', () => {
     const completed = trackedMatch(
       'completed-match', 100,
       participation([{ playerId: alex.id, nameSnapshot: 'Alex, match snapshot' }], [alex.id]),
+      { goals: [goalEvent('completed-goal', alex.id, null, 'home', 'Alex, match snapshot')] },
     )
     const running = trackedMatch(
       'running-match', 200,
@@ -185,9 +217,12 @@ describe('PlayerStatisticsPage', () => {
     const { wrapper, matchStore } = await mountStatistics(alex.id, [alex], [completed, running])
     try {
       expect(wrapper.get('[data-testid="total-playing-time"]').text()).toBe('47:00')
+      expect(wrapper.get('[data-testid="goal-count"]').text()).toBe('1')
+      expect(wrapper.get('[data-testid="assist-count"]').text()).toBe('0')
       await vi.advanceTimersByTimeAsync(2_000)
       await flushPromises()
       expect(wrapper.get('[data-testid="total-playing-time"]').text()).toBe('47:02')
+      expect(wrapper.get('[data-testid="goal-count"]').text()).toBe('1')
       const liveRow = wrapper.get('[data-match-id="running-match"]')
       expect(liveRow.text()).toContain('vs West Town')
       expect(liveRow.text()).toContain('HOME')
@@ -204,6 +239,7 @@ describe('PlayerStatisticsPage', () => {
       await vi.advanceTimersByTimeAsync(5_000)
       await flushPromises()
       expect(wrapper.get('[data-testid="total-playing-time"]').text()).toBe('47:02')
+      expect(wrapper.get('[data-testid="goal-count"]').text()).toBe('1')
       expect(wrapper.get('[data-match-id="running-match"] .live-contribution').text()).toBe('ONGOING')
       expect(wrapper.get('[data-testid="appearance-count"]').text()).toBe('2')
     } finally {
@@ -212,27 +248,46 @@ describe('PlayerStatisticsPage', () => {
   })
 
   it('distinguishes same-name directory identities on their separate statistics pages', async () => {
-    const first = createPlayer('Alex Morgan', 100, 'identity-alex-one')
-    const second = createPlayer('Alex Morgan', 200, 'identity-alex-two')
+    const longName = 'Alex Morgan With An Exceptionally Long Match Day Name'
+    const first = createPlayer(longName, 100, 'identity-alex-one')
+    const second = createPlayer(longName, 200, 'identity-alex-two')
     const match = trackedMatch(
       'same-name-statistics', 100,
       participation([
         { playerId: first.id, nameSnapshot: 'Alex Morgan' },
         { playerId: second.id, nameSnapshot: 'Alex Morgan' },
       ], [first.id]),
-      { completed: { 1: 1_000, 2: null } },
+      {
+        completed: { 1: 1_000, 2: null },
+        goals: [goalEvent('one-identity-goal', first.id, null, 'home', longName)],
+      },
     )
     const firstPage = await mountStatistics(first.id, [first, second], [match])
     const secondPage = await mountStatistics(second.id, [first, second], [match])
     try {
       const firstName = firstPage.wrapper.get('#player-statistics-heading').text()
       const secondName = secondPage.wrapper.get('#player-statistics-heading').text()
-      expect(firstName).toContain('Alex Morgan ·')
-      expect(secondName).toContain('Alex Morgan ·')
+      expect(firstName).toContain(`${longName} ·`)
+      expect(secondName).toContain(`${longName} ·`)
       expect(firstName).not.toBe(secondName)
       expect(firstPage.wrapper.get('[data-testid="appearance-count"]').text()).toBe('1')
       expect(secondPage.wrapper.get('[data-testid="appearance-count"]').text()).toBe('0')
+      expect(firstPage.wrapper.get('[data-testid="goal-count"]').text()).toBe('1')
+      expect(secondPage.wrapper.get('[data-testid="goal-count"]').text()).toBe('0')
       expect(secondPage.wrapper.get('[data-match-id="same-name-statistics"] .breakdown-time').text()).toBe('00:00')
+
+      const renamed = await firstPage.playerStore.persist({
+        ...first,
+        name: 'Alexandra Morgan',
+        updatedAt: 300,
+      })
+      await flushPromises()
+      expect(firstPage.wrapper.get('#player-statistics-heading').text()).toBe('Alexandra Morgan')
+      expect(firstPage.wrapper.get('[data-testid="goal-count"]').text()).toBe('1')
+      await firstPage.playerStore.persist({ ...renamed, archived: true, updatedAt: 400 })
+      await flushPromises()
+      expect(firstPage.wrapper.get('.archived-label').text()).toContain('ARCHIVED PLAYER')
+      expect(firstPage.wrapper.get('[data-testid="goal-count"]').text()).toBe('1')
     } finally {
       firstPage.wrapper.unmount()
       secondPage.wrapper.unmount()
@@ -247,10 +302,45 @@ describe('PlayerStatisticsPage', () => {
     try {
       expect(wrapper.get('[data-testid="total-playing-time"]').text()).toBe('00:00')
       expect(wrapper.get('[data-testid="appearance-count"]').text()).toBe('0')
+      expect(wrapper.get('[data-testid="goal-count"]').text()).toBe('0')
+      expect(wrapper.get('[data-testid="assist-count"]').text()).toBe('0')
       expect(wrapper.find('.breakdown-row').exists()).toBe(false)
       expect(wrapper.get('.untracked-note').text()).toContain('1 match without player tracking')
       expect(wrapper.get('.untracked-note').text()).toContain('Old Harbor vs Old Valley')
       expect(wrapper.get('.untracked-note').text()).toContain('Goal names are not used to infer player history.')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('publishes corrected goal totals only after the match details commit', async () => {
+    const alex = createPlayer('Alex Morgan', 100, 'alex-id')
+    const sam = createPlayer('Sam Kerr', 200, 'sam-id')
+    const match = trackedMatch(
+      'committed-goal-details', 100,
+      participation([
+        { playerId: alex.id, nameSnapshot: 'Alex match snapshot' },
+        { playerId: sam.id, nameSnapshot: 'Sam match snapshot' },
+      ], [alex.id]),
+      { goals: [goalEvent('committed-goal', alex.id, null, 'home', 'Alex match snapshot')] },
+    )
+    const { wrapper, matchStore } = await mountStatistics(alex.id, [alex, sam], [match])
+    try {
+      expect(wrapper.get('[data-testid="goal-count"]').text()).toBe('1')
+      expect(wrapper.get('[data-testid="total-playing-time"]').text()).toBe('47:00')
+      expect(wrapper.get('[data-testid="appearance-count"]').text()).toBe('1')
+
+      const draft = structuredClone(match)
+      draft.goals[0].scorerPlayerId = sam.id
+      draft.goals[0].scorer = 'Sam match snapshot'
+      expect(wrapper.get('[data-testid="goal-count"]').text()).toBe('1')
+
+      await matchStore.persist(draft)
+      await flushPromises()
+      expect(wrapper.get('[data-testid="goal-count"]').text()).toBe('0')
+      expect(wrapper.get('[data-testid="total-playing-time"]').text()).toBe('47:00')
+      expect(wrapper.get('[data-testid="appearance-count"]').text()).toBe('1')
+      expect(wrapper.find('[data-match-id="committed-goal-details"]').exists()).toBe(true)
     } finally {
       wrapper.unmount()
     }

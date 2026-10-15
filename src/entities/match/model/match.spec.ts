@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { createMatch, scoreFor } from './match'
 
 describe('match model', () => {
-  it('creates matches without participation or completed half durations', () => {
+  it('creates matches without participation, jersey assignments, or completed half durations', () => {
     const match = createMatch('North City', 'South Town', 100, 'new-match')
 
     expect(match.participation).toBeNull()
+    expect(match.firstKickoffAt).toBeNull()
+    expect(match.jerseyAssignment).toBeNull()
     expect(match.completedPeriodElapsedMs).toEqual({ 1: null, 2: null })
   })
 
@@ -14,11 +16,11 @@ describe('match model', () => {
     match.goals.push(
       {
         id: 'home-goal', side: 'home', period: 1, elapsedMs: 60_000,
-        scorer: '', assist: '', description: '', createdAt: 200,
+        scorerPlayerId: null, scorer: '', assistPlayerId: null, assist: '', description: '', createdAt: 200,
       },
       {
         id: 'away-goal', side: 'away', period: 2, elapsedMs: 30_000,
-        scorer: '', assist: '', description: '', createdAt: 300,
+        scorerPlayerId: null, scorer: '', assistPlayerId: null, assist: '', description: '', createdAt: 300,
       },
     )
 

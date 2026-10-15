@@ -17,6 +17,26 @@ describe('recordMatchGoal', () => {
     const match: Match = {
       ...createMatch('North City', 'South Town', 100, 'goal-action'),
       clock: { period: 1, elapsedMs: 500, status: 'running', startedAt: 2_000 },
+      firstKickoffAt: 1_900,
+      participation: {
+        ownSide: 'home',
+        squad: [{ playerId: 'player-alex', nameSnapshot: 'Alex' }],
+        starterIds: ['player-alex'],
+        substitutions: [],
+      },
+      goals: [{
+        id: 'older-attributed-goal', side: 'home', period: 1, elapsedMs: 80_000,
+        scorerPlayerId: 'player-alex', scorer: 'Alex snapshot',
+        assistPlayerId: null, assist: '', description: '', createdAt: 1_800,
+      }],
+      jerseyAssignment: {
+        setId: 'set-blue',
+        setNameSnapshot: 'Blue',
+        rows: [{
+          playerId: 'player-alex',
+          jersey: { jerseyId: 'jersey-zero', number: 0, size: 'M', ownerPlayerId: null },
+        }],
+      },
     }
     const commit = deferred<Match>()
     let savedSnapshot: DeepReadonly<Match> | undefined
@@ -29,7 +49,10 @@ describe('recordMatchGoal', () => {
     const action = recordMatchGoal(match, 'home', store, now)
     expect(persist).toHaveBeenCalledWith(expect.objectContaining({
       updatedAt: now,
-      goals: [expect.objectContaining({
+      firstKickoffAt: 1_900,
+      participation: match.participation,
+      jerseyAssignment: match.jerseyAssignment,
+      goals: [match.goals[0], expect.objectContaining({
         side: 'home',
         period: 1,
         elapsedMs: 1_000,
@@ -45,7 +68,8 @@ describe('recordMatchGoal', () => {
     commit.resolve(savedSnapshot as Match)
     const result = await action
     expect(result.acceptedAt).toBe(now)
-    expect(result.goalId).toBe(savedSnapshot?.goals[0].id)
+    expect(savedSnapshot?.goals[0]).toEqual(match.goals[0])
+    expect(result.goalId).toBe(savedSnapshot?.goals.at(-1)?.id)
     expect(result.goalId).toBeTruthy()
   })
 

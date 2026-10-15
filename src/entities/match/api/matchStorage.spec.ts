@@ -50,6 +50,78 @@ function literalVersion1Match(
   }
 }
 
+function literalVersion2Match(id: string) {
+  return {
+    ...literalVersion1Match(id),
+    recordVersion: 2,
+    participation: null,
+    completedPeriodElapsedMs: { 1: null, 2: null },
+  }
+}
+
+function matchWithJerseyAssignment(id: string, partial = false) {
+  const match = createMatch('North City', 'South Town', 100, id)
+  return {
+    ...match,
+    clock: { period: 1 as const, elapsedMs: 0, status: 'paused' as const, startedAt: null },
+    firstKickoffAt: 200,
+    participation: {
+      ownSide: 'home' as const,
+      squad: [
+        { playerId: 'player-alex', nameSnapshot: 'Alex' },
+        { playerId: 'player-ben', nameSnapshot: 'Ben' },
+      ],
+      starterIds: ['player-alex'],
+      substitutions: [],
+    },
+    jerseyAssignment: {
+      setId: 'set-blue',
+      setNameSnapshot: 'Blue',
+      rows: [
+        {
+          playerId: 'player-alex',
+          jersey: { jerseyId: 'jersey-zero', number: 0, size: '164', ownerPlayerId: 'player-ben' },
+        },
+        {
+          playerId: 'player-ben',
+          jersey: partial ? null : { jerseyId: 'jersey-eight', number: 8, size: 'XL', ownerPlayerId: null },
+        },
+      ],
+    },
+  }
+}
+
+function literalVersion3Match(id: string) {
+  return {
+    ...literalVersion1Match(id),
+    recordVersion: 3,
+    participation: null,
+    completedPeriodElapsedMs: { 1: null, 2: null },
+    firstKickoffAt: null,
+    jerseyAssignment: null,
+  }
+}
+
+function literalVersion4Match(id: string) {
+  const match = matchWithJerseyAssignment(id)
+  return {
+    ...match,
+    recordVersion: 4,
+    goals: [{
+      id: `${id}-linked-goal`,
+      side: 'home',
+      period: 1,
+      elapsedMs: 30_123,
+      scorerPlayerId: 'player-alex',
+      scorer: 'Alex snapshot',
+      assistPlayerId: null,
+      assist: '',
+      description: '',
+      createdAt: 150,
+    }],
+  }
+}
+
 function writeRawRecord(database: IDBDatabase, record: unknown): Promise<void> {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction('matches', 'readwrite')
@@ -99,7 +171,9 @@ describe('IndexedDB match repository', () => {
             side: 'home' as const,
             period: 1 as const,
             elapsedMs: 60_000,
+            scorerPlayerId: null,
             scorer: 'A. Player',
+            assistPlayerId: null,
             assist: 'B. Player',
             description: 'A finish',
             createdAt: 120,
@@ -144,6 +218,184 @@ describe('IndexedDB match repository', () => {
     })
   })
 
+  it('reads version-2 records without writing and preserves or omits their original backups on upgrade', async () => {
+    await withRepository(async (repository, fixture) => {
+      const originalBackup = { original: ['v1', { retained: true }] }
+      const backed = { ...literalVersion2Match('version-2-backed'), legacyV1Backup: originalBackup }
+      const plain = literalVersion2Match('version-2-no-backup')
+      const database = await fixture.open()
+      await writeRawRecord(database, backed)
+      await writeRawRecord(database, plain)
+      database.close()
+
+      const normalized = await repository.getMatch(backed.id)
+      expect(normalized).toMatchObject({ firstKickoffAt: null, jerseyAssignment: null })
+      const beforeUpgrade = await fixture.open()
+      await expect(readRawRecord(beforeUpgrade, backed.id)).resolves.toEqual(backed)
+      await expect(readRawRecord(beforeUpgrade, plain.id)).resolves.toEqual(plain)
+      beforeUpgrade.close()
+
+      await repository.saveMatch({ ...normalized!, awayTeam: 'East Town' })
+      await repository.saveMatch({ ...(await repository.getMatch(plain.id))!, awayTeam: 'West Town' })
+      const afterUpgrade = await fixture.open()
+      const backedRecord = await readRawRecord(afterUpgrade, backed.id) as Record<string, unknown>
+      const plainRecord = await readRawRecord(afterUpgrade, plain.id) as Record<string, unknown>
+      expect(backedRecord.recordVersion).toBe(4)
+      expect(backedRecord.legacyV1Backup).toEqual(originalBackup)
+      expect(plainRecord.recordVersion).toBe(4)
+      expect(Object.hasOwn(plainRecord, 'legacyV1Backup')).toBe(false)
+      afterUpgrade.close()
+    })
+  })
+
+  it('normalizes a version-3 name-only goal without inferring links or writing the record', async () => {
+    await withRepository(async (repository, fixture) => {
+      const legacy = literalVersion3Match('version-3-name-only')
+      const database = await fixture.open()
+      await writeRawRecord(database, legacy)
+      database.close()
+
+      await expect(repository.getMatch(legacy.id)).resolves.toMatchObject({
+        goals: [{ scorerPlayerId: null, scorer: 'M. Striker', assistPlayerId: null, assist: '' }],
+      })
+      const inspect = await fixture.open()
+      await expect(readRawRecord(inspect, legacy.id)).resolves.toEqual(legacy)
+      inspect.close()
+    })
+  })
+
+  it('preserves existing version-2, version-3, and version-4 backups on the next format-4 save', async () => {
+    await withRepository(async (repository, fixture) => {
+      const records = [
+        { ...literalVersion2Match('backup-v2'), legacyV1Backup: { exact: ['v2', { nested: true }] } },
+        { ...literalVersion3Match('backup-v3'), legacyV1Backup: { exact: ['v3', { nested: true }] } },
+        { ...literalVersion4Match('backup-v4'), legacyV1Backup: { exact: ['v4', { nested: true }] } },
+      ]
+      const database = await fixture.open()
+      for (const record of records) await writeRawRecord(database, record)
+      database.close()
+
+      for (const record of records) {
+        const normalized = await repository.getMatch(record.id)
+        await repository.saveMatch({ ...normalized!, updatedAt: normalized!.updatedAt + 1 })
+      }
+
+      const inspect = await fixture.open()
+      for (const record of records) {
+        const saved = await readRawRecord(inspect, record.id) as Record<string, unknown>
+        expect(saved.recordVersion).toBe(4)
+        expect(saved.legacyV1Backup).toEqual(record.legacyV1Backup)
+      }
+      inspect.close()
+    })
+  })
+
+  it('reads valid version-4 links from saved match data without a live player directory or writing', async () => {
+    await withRepository(async (repository, fixture) => {
+      const linked = literalVersion4Match('version-4-linked')
+      const database = await fixture.open()
+      await writeRawRecord(database, linked)
+      database.close()
+
+      await expect(repository.getMatch(linked.id)).resolves.toMatchObject({
+        goals: [{ scorerPlayerId: 'player-alex', scorer: 'Alex snapshot', assistPlayerId: null, assist: '' }],
+      })
+      const inspect = await fixture.open()
+      await expect(readRawRecord(inspect, linked.id)).resolves.toEqual(linked)
+      expect(inspect.version).toBe(1)
+      inspect.close()
+    })
+  })
+
+  it.each([
+    ['missing scorer identity', (record: Record<string, unknown>) => {
+      delete (record.goals as Array<Record<string, unknown>>)[0].scorerPlayerId
+    }],
+    ['missing assist identity', (record: Record<string, unknown>) => {
+      delete (record.goals as Array<Record<string, unknown>>)[0].assistPlayerId
+    }],
+    ['blank scorer identity', (record: Record<string, unknown>) => {
+      (record.goals as Array<Record<string, unknown>>)[0].scorerPlayerId = '  '
+    }],
+    ['outside-squad identity', (record: Record<string, unknown>) => {
+      (record.goals as Array<Record<string, unknown>>)[0].scorerPlayerId = 'not-in-squad'
+    }],
+    ['opponent-side attribution', (record: Record<string, unknown>) => {
+      (record.goals as Array<Record<string, unknown>>)[0].side = 'away'
+    }],
+  ])('rejects version-4 records with %s without changing stored data', async (_label, corrupt) => {
+    await withRepository(async (repository, fixture) => {
+      const record = literalVersion4Match(`invalid-v4-${String(_label)}`) as unknown as Record<string, unknown>
+      corrupt(record)
+      const database = await fixture.open()
+      await writeRawRecord(database, record)
+      database.close()
+
+      await expect(repository.getMatch(String(record.id))).rejects.toThrow()
+      const inspect = await fixture.open()
+      await expect(readRawRecord(inspect, String(record.id))).resolves.toEqual(record)
+      inspect.close()
+    })
+  })
+
+  it('round-trips complete and partial version-4 distributions and explicit nullable goal links', async () => {
+    await withRepository(async (repository, fixture) => {
+      const complete = {
+        ...matchWithJerseyAssignment('v4-complete'),
+        goals: [{
+          id: 'linked-goal', side: 'home' as const, period: 1 as const, elapsedMs: 30_123,
+          scorerPlayerId: 'player-alex', scorer: 'Alex snapshot',
+          assistPlayerId: null, assist: '', description: '', createdAt: 150,
+        }],
+      }
+      const partial = { ...matchWithJerseyAssignment('v4-partial', true), firstKickoffAt: null,
+        clock: { period: 1 as const, elapsedMs: 0, status: 'not-started' as const, startedAt: null } }
+      await repository.saveMatch(complete)
+      await repository.saveMatch(partial)
+
+      await expect(repository.getMatch(complete.id)).resolves.toEqual(complete)
+      await expect(repository.getMatch(partial.id)).resolves.toEqual(partial)
+      const database = await fixture.open()
+      const completeRecord = await readRawRecord(database, complete.id) as Record<string, unknown>
+      const partialRecord = await readRawRecord(database, partial.id) as Record<string, unknown>
+      expect(completeRecord.recordVersion).toBe(4)
+      expect(Object.hasOwn(completeRecord, 'firstKickoffAt')).toBe(true)
+      expect(Object.hasOwn(completeRecord, 'jerseyAssignment')).toBe(true)
+      expect(completeRecord.goals).toEqual(complete.goals)
+      expect(partialRecord.firstKickoffAt).toBeNull()
+      expect(partialRecord.jerseyAssignment).toEqual(partial.jerseyAssignment)
+      expect(database.version).toBe(1)
+      expect([...database.objectStoreNames]).toEqual(['matches'])
+      database.close()
+    })
+  })
+
+  it.each([
+    ['missing firstKickoffAt', (record: Record<string, unknown>) => { delete record.firstKickoffAt }],
+    ['missing jerseyAssignment', (record: Record<string, unknown>) => { delete record.jerseyAssignment }],
+    ['duplicate jersey number', (record: Record<string, unknown>) => {
+      const assignment = record.jerseyAssignment as {
+        rows: Array<{ jersey: { jerseyId: string; number: number; size: string; ownerPlayerId: string | null } | null }>
+      }
+      assignment.rows[1].jersey = { jerseyId: 'another-jersey', number: 0, size: 'L', ownerPlayerId: null }
+    }],
+    ['known kickoff on an unstarted match', (record: Record<string, unknown>) => { record.clock = { period: 1, elapsedMs: 0, status: 'not-started', startedAt: null } }],
+  ])('rejects version-3 records with %s', async (_description, corrupt) => {
+    await withRepository(async (repository, fixture) => {
+      const record = { ...matchWithJerseyAssignment(`invalid-v3-${String(_description)}`), recordVersion: 3 } as unknown as Record<string, unknown>
+      corrupt(record)
+      const database = await fixture.open()
+      await writeRawRecord(database, record)
+      database.close()
+
+      await expect(repository.getMatch(String(record.id))).rejects.toThrow()
+      await expect(repository.listMatches()).rejects.toThrow()
+      const inspect = await fixture.open()
+      await expect(readRawRecord(inspect, String(record.id))).resolves.toEqual(record)
+      inspect.close()
+    })
+  })
+
   it('lazily upgrades a version-1 record and preserves its original backup across later saves', async () => {
     await withRepository(async (repository, fixture) => {
       const legacy = literalVersion1Match('legacy-lazy-upgrade', {
@@ -163,7 +415,7 @@ describe('IndexedDB match repository', () => {
       await repository.saveMatch(firstSave)
       const afterFirstSave = await fixture.open()
       const firstStored = await readRawRecord(afterFirstSave, legacy.id) as Record<string, unknown>
-      expect(firstStored.recordVersion).toBe(2)
+      expect(firstStored.recordVersion).toBe(4)
       expect(firstStored.legacyV1Backup).toEqual(legacy)
       afterFirstSave.close()
 
@@ -171,7 +423,7 @@ describe('IndexedDB match repository', () => {
       await repository.saveMatch(secondSave)
       const afterSecondSave = await fixture.open()
       const secondStored = await readRawRecord(afterSecondSave, legacy.id) as Record<string, unknown>
-      expect(secondStored.recordVersion).toBe(2)
+      expect(secondStored.recordVersion).toBe(4)
       expect(secondStored.legacyV1Backup).toEqual(legacy)
       afterSecondSave.close()
 
@@ -179,25 +431,47 @@ describe('IndexedDB match repository', () => {
     })
   })
 
-  it('supports mixed version-1 and version-2 records without bulk migration', async () => {
+  it('supports mixed version-1 through version-4 records without bulk migration', async () => {
     await withRepository(async (repository, fixture) => {
       const legacy = literalVersion1Match('legacy-mixed-record')
+      const version2 = literalVersion2Match('version-2-mixed-record')
+      const version3 = literalVersion3Match('version-3-mixed-record')
+      const version4 = literalVersion4Match('version-4-mixed-record')
       const database = await fixture.open()
       await writeRawRecord(database, legacy)
+      await writeRawRecord(database, version2)
+      await writeRawRecord(database, version3)
+      await writeRawRecord(database, version4)
       database.close()
 
       const modern = createMatch('Harbor FC', 'Valley United', 1_699_999_600_000, 'new-mixed-record')
       await repository.saveMatch(modern)
-      await expect(repository.listMatches()).resolves.toEqual([modern, expect.objectContaining({
-        id: legacy.id,
+      const loaded = await repository.listMatches()
+      expect(loaded).toHaveLength(5)
+      expect(loaded.find(({ id }) => id === modern.id)).toEqual(modern)
+      expect(loaded.find(({ id }) => id === legacy.id)).toMatchObject({
         participation: null,
+        firstKickoffAt: null,
+        jerseyAssignment: null,
         completedPeriodElapsedMs: { 1: null, 2: null },
-      })])
+      })
+      expect(loaded.find(({ id }) => id === version2.id)).toMatchObject({
+        participation: null,
+        firstKickoffAt: null,
+        jerseyAssignment: null,
+      })
+      expect(loaded.find(({ id }) => id === version3.id)?.goals[0]).toMatchObject({ scorerPlayerId: null })
+      expect(loaded.find(({ id }) => id === version4.id)?.goals[0]).toMatchObject({
+        scorerPlayerId: 'player-alex', assistPlayerId: null,
+      })
 
       const inspect = await fixture.open()
       await expect(readRawRecord(inspect, legacy.id)).resolves.toEqual(legacy)
+      await expect(readRawRecord(inspect, version2.id)).resolves.toEqual(version2)
+      await expect(readRawRecord(inspect, version3.id)).resolves.toEqual(version3)
+      await expect(readRawRecord(inspect, version4.id)).resolves.toEqual(version4)
       const modernStored = await readRawRecord(inspect, modern.id) as Record<string, unknown>
-      expect(modernStored.recordVersion).toBe(2)
+      expect(modernStored.recordVersion).toBe(4)
       inspect.close()
     })
   })
@@ -255,10 +529,80 @@ describe('IndexedDB match repository', () => {
       await repository.saveMatch(retry)
       const afterRetry = await fixture.open()
       const saved = await readRawRecord(afterRetry, legacy.id) as Record<string, unknown>
-      expect(saved.recordVersion).toBe(2)
+      expect(saved.recordVersion).toBe(4)
       expect(saved.legacyV1Backup).toEqual(legacy)
       afterRetry.close()
       await expect(repository.getMatch(legacy.id)).resolves.toEqual(retry)
+    })
+  })
+
+  it('keeps a version-2 record and unrelated matches intact when a distribution write aborts, then retries', async () => {
+    await withRepository(async (repository, fixture) => {
+      const originalBackup = { raw: 'existing-v1-backup', details: [1, 2, 3] }
+      const version2 = { ...literalVersion2Match('v2-distribution-retry'), legacyV1Backup: originalBackup }
+      const database = await fixture.open()
+      await writeRawRecord(database, version2)
+      database.close()
+
+      const unrelated = createMatch('Harbor FC', 'Valley United', 1_700_000_000_000, 'unrelated-v3-match')
+      await repository.saveMatch(unrelated)
+      const store = createMatchStore(repository)
+      await store.load()
+      const committed = store.matches.value.find(({ id }) => id === version2.id)!
+      const unrelatedBefore = await repository.getMatch(unrelated.id)
+      const candidate = {
+        ...committed,
+        updatedAt: committed.updatedAt + 1,
+        participation: {
+          ownSide: 'home' as const,
+          squad: [
+            { playerId: 'player-alex', nameSnapshot: 'Alex' },
+            { playerId: 'player-ben', nameSnapshot: 'Ben' },
+          ],
+          starterIds: ['player-alex'],
+          substitutions: [],
+        },
+        jerseyAssignment: {
+          setId: 'set-blue',
+          setNameSnapshot: 'Blue',
+          rows: [
+            { playerId: 'player-alex', jersey: { jerseyId: 'jersey-zero', number: 0, size: 'M', ownerPlayerId: null } },
+            { playerId: 'player-ben', jersey: null },
+          ],
+        },
+      }
+      const originalPut = IDBObjectStore.prototype.put
+      const abortingPut = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (
+        this: IDBObjectStore,
+        value: unknown,
+        key?: IDBValidKey,
+      ) {
+        const request = originalPut.call(this, value, key)
+        request.addEventListener('success', () => this.transaction.abort(), { once: true })
+        return request
+      })
+
+      try {
+        await expect(store.persist(candidate)).rejects.toThrow()
+      } finally {
+        abortingPut.mockRestore()
+      }
+
+      expect(store.matches.value.find(({ id }) => id === version2.id)).toEqual(committed)
+      const afterFailure = await fixture.open()
+      await expect(readRawRecord(afterFailure, version2.id)).resolves.toEqual(version2)
+      afterFailure.close()
+      await expect(repository.getMatch(unrelated.id)).resolves.toEqual(unrelatedBefore)
+
+      await store.persist(candidate)
+      const afterRetry = await fixture.open()
+      const upgraded = await readRawRecord(afterRetry, version2.id) as Record<string, unknown>
+      expect(upgraded.recordVersion).toBe(4)
+      expect(upgraded.legacyV1Backup).toEqual(originalBackup)
+      expect(upgraded.jerseyAssignment).toEqual(candidate.jerseyAssignment)
+      await expect(readRawRecord(afterRetry, unrelated.id)).resolves.toEqual({ ...unrelated, recordVersion: 4 })
+      afterRetry.close()
+      store.dispose()
     })
   })
 

@@ -26,6 +26,24 @@ export interface MatchParticipation {
   substitutions: SubstitutionEvent[]
 }
 
+export interface MatchJerseySnapshot {
+  jerseyId: string
+  number: number
+  size: string
+  ownerPlayerId: string | null
+}
+
+export interface MatchJerseyAssignmentRow {
+  playerId: string
+  jersey: MatchJerseySnapshot | null
+}
+
+export interface MatchJerseyAssignment {
+  setId: string
+  setNameSnapshot: string
+  rows: MatchJerseyAssignmentRow[]
+}
+
 export type CompletedPeriodElapsedMs = Record<MatchPeriod, number | null>
 
 export interface ClockState {
@@ -40,7 +58,9 @@ export interface GoalEvent {
   side: MatchSide
   period: MatchPeriod
   elapsedMs: number
+  scorerPlayerId: string | null
   scorer: string
+  assistPlayerId: string | null
   assist: string
   description: string
   createdAt: number
@@ -55,6 +75,8 @@ export interface MatchRecord {
   clock: ClockState
   goals: GoalEvent[]
   participation: MatchParticipation | null
+  firstKickoffAt: number | null
+  jerseyAssignment: MatchJerseyAssignment | null
   completedPeriodElapsedMs: CompletedPeriodElapsedMs
 }
 
@@ -80,6 +102,8 @@ export function createMatch(
     },
     goals: [],
     participation: null,
+    firstKickoffAt: null,
+    jerseyAssignment: null,
     completedPeriodElapsedMs: { 1: null, 2: null },
   }
 }

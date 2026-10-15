@@ -14,6 +14,7 @@ function finishedMatch(
   return {
     ...createMatch('North City', 'South Town', 100, 'edit-substitution-model'),
     clock: { period: 1, elapsedMs: firstHalfMs, status: 'full-time', startedAt: null },
+    firstKickoffAt: 200,
     completedPeriodElapsedMs: { 1: firstHalfMs, 2: null },
     participation: {
       ownSide: 'home',
@@ -24,6 +25,15 @@ function finishedMatch(
       ],
       starterIds: ['alex'],
       substitutions: events,
+    },
+    jerseyAssignment: {
+      setId: 'set-blue',
+      setNameSnapshot: 'Blue',
+      rows: [
+        { playerId: 'alex', jersey: { jerseyId: 'jersey-alex', number: 7, size: 'M', ownerPlayerId: null } },
+        { playerId: 'sam', jersey: { jerseyId: 'jersey-sam', number: 8, size: 'L', ownerPlayerId: 'jordan' } },
+        { playerId: 'jordan', jersey: { jerseyId: 'jersey-jordan', number: 9, size: 'XL', ownerPlayerId: null } },
+      ],
     },
   }
 }
@@ -62,6 +72,8 @@ describe('edit-substitution model', () => {
     if (result.valid) {
       expect(result.events[0]).toMatchObject({ incomingPlayerId: 'jordan', elapsedMs: 1_500 })
       expect(result.match.updatedAt).toBe(500)
+      expect(result.match.firstKickoffAt).toBe(match.firstKickoffAt)
+      expect(result.match.jerseyAssignment).toEqual(match.jerseyAssignment)
     }
     expect(match).toEqual(original)
   })

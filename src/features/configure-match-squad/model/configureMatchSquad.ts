@@ -5,8 +5,12 @@ import {
   type MatchParticipation,
   type MatchSide,
   type MatchStore,
+  copyMatchSnapshot,
+  reconcileGoalAttributions,
+  reconcileMatchJerseyAssignment,
+  validateMatchJerseyAssignment,
 } from '../../../entities/match'
-import type { Player } from '../../../entities/player'
+import type { ReadonlyPlayer } from '../../../entities/player'
 
 export interface MatchSquadDraft {
   ownSide: MatchSide | ''
@@ -27,7 +31,7 @@ export type BuildMatchParticipationResult =
 
 export function buildMatchParticipation(
   draft: MatchSquadDraft,
-  directoryPlayers: readonly Player[],
+  directoryPlayers: readonly ReadonlyPlayer[],
   previous: DeepReadonly<MatchParticipation> | null,
 ): BuildMatchParticipationResult {
   if (draft.ownSide !== 'home' && draft.ownSide !== 'away') {
@@ -75,22 +79,19 @@ function matchSnapshotWithParticipation(
   participation: MatchParticipation | null,
   now: number,
 ): Match {
-  return {
-    id: match.id,
-    homeTeam: match.homeTeam,
-    awayTeam: match.awayTeam,
-    createdAt: match.createdAt,
-    updatedAt: now,
-    clock: { ...match.clock },
-    goals: match.goals.map((goal) => ({ ...goal })),
-    participation: participation ? {
-      ownSide: participation.ownSide,
-      squad: participation.squad.map((player) => ({ ...player })),
-      starterIds: [...participation.starterIds],
-      substitutions: participation.substitutions.map((event) => ({ ...event })),
-    } : null,
-    completedPeriodElapsedMs: { ...match.completedPeriodElapsedMs },
-  }
+  const snapshot = copyMatchSnapshot(match)
+  snapshot.updatedAt = now
+  snapshot.participation = participation ? {
+    ownSide: participation.ownSide,
+    squad: participation.squad.map((player) => ({ ...player })),
+    starterIds: [...participation.starterIds],
+    substitutions: participation.substitutions.map((event) => ({ ...event })),
+  } : null
+  snapshot.jerseyAssignment = reconcileMatchJerseyAssignment(match.jerseyAssignment, snapshot.participation)
+  snapshot.goals = reconcileGoalAttributions(snapshot.goals, snapshot.participation)
+  const assignmentError = validateMatchJerseyAssignment(snapshot.participation, snapshot.jerseyAssignment)
+  if (assignmentError) throw new Error(assignmentError)
+  return snapshot
 }
 
 export async function persistMatchParticipationSetup(

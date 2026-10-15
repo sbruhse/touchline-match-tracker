@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch, type DeepReadonly } from 'vue'
-import { formatMatchMinute, parseMatchMinute, useMatchStore, type GoalEvent, type MatchSide } from '../../../entities/match'
+import { formatMatchMinute, getAcceptedJerseyNumber, useMatchStore, type GoalEvent, type MatchSide } from '../../../entities/match'
+import { createPlayerIdentityLabels } from '../../../entities/player'
 import { FocusedEditorShell } from '../../../shared/ui'
+import type { GoalPlayerDraft, GoalPlayerOption } from '../model/goalPlayerDraft'
+import { prepareGoalEdit } from '../model/prepareGoalEdit'
 import { persistGoalEdit } from '../model/persistGoalEdit'
+import GoalPlayerField from './components/GoalPlayerField.vue'
 
 const props = defineProps<{
   matchId: string
@@ -24,11 +28,12 @@ const launcher = ref<HTMLElement | null>(null)
 const hasDraft = ref(false)
 const saveError = ref('')
 const timeError = ref('')
+const savedDisplayTime = ref('')
 const draft = reactive({
   side: 'home' as MatchSide,
   time: '',
-  scorer: '',
-  assist: '',
+  scorer: { mode: 'none' } as GoalPlayerDraft,
+  assist: { mode: 'none' } as GoalPlayerDraft,
   description: '',
 })
 
@@ -39,6 +44,26 @@ const launcherLabel = computed(() => hasDetails.value ? 'Edit' : 'Add details')
 const launcherAccessibleLabel = computed(() => `${hasDetails.value ? 'Edit details' : 'Add details'} for ${teamName(props.goal.side)} goal at ${formatMatchMinute(props.goal.period, props.goal.elapsedMs)}`)
 const editorTitle = computed(() => hasDetails.value ? 'Edit goal details' : 'Add goal details')
 const formId = 'goal-edit-form'
+const participation = computed(() => match.value?.participation ?? null)
+const hasSquadChoices = computed(() => participation.value?.ownSide === draft.side)
+const playerOptions = computed<GoalPlayerOption[]>(() => {
+  const squad = participation.value?.squad ?? []
+  const identityLabels = createPlayerIdentityLabels(squad.map(({ playerId, nameSnapshot }) => ({
+    id: playerId,
+    name: nameSnapshot,
+  })))
+  const jerseyAssignment = match.value?.jerseyAssignment ?? null
+
+  return squad.map(({ playerId, nameSnapshot }) => {
+    const number = getAcceptedJerseyNumber(jerseyAssignment, playerId)
+    const name = identityLabels.get(playerId) ?? nameSnapshot
+    return {
+      playerId,
+      name: nameSnapshot,
+      label: number === undefined || number === null ? name : `#${number} ${name}`,
+    }
+  })
+})
 
 function teamName(side: MatchSide): string {
   return side === 'home' ? props.homeTeam : props.awayTeam
@@ -53,11 +78,25 @@ function focusFallback(): HTMLElement | null {
     ?? launcher.value
 }
 
+function roleDraft(playerId: string | null, name: string): GoalPlayerDraft {
+  if (playerId !== null) {
+    const option = playerOptions.value.find((candidate) => candidate.playerId === playerId)
+    return {
+      mode: 'squad',
+      playerId,
+      name,
+      label: option?.label ?? name,
+    }
+  }
+  return name.trim() ? { mode: 'manual', name } : { mode: 'none' }
+}
+
 function loadSavedValues(goal: DeepReadonly<GoalEvent> = props.goal): void {
   draft.side = goal.side
   draft.time = formatMatchMinute(goal.period, goal.elapsedMs).replace('′', '')
-  draft.scorer = goal.scorer
-  draft.assist = goal.assist
+  savedDisplayTime.value = draft.time
+  draft.scorer = roleDraft(goal.scorerPlayerId, goal.scorer)
+  draft.assist = roleDraft(goal.assistPlayerId, goal.assist)
   draft.description = goal.description
 }
 
@@ -66,14 +105,30 @@ watch(() => props.open, (open) => {
     loadSavedValues()
     hasDraft.value = true
   }
+}, { immediate: true })
+
+watch(playerOptions, (options) => {
+  const refreshLabel = (role: GoalPlayerDraft): GoalPlayerDraft => {
+    if (role.mode !== 'squad') return role
+    const option = options.find((candidate) => candidate.playerId === role.playerId)
+    return option ? { ...role, label: option.label } : role
+  }
+  draft.scorer = refreshLabel(draft.scorer)
+  draft.assist = refreshLabel(draft.assist)
 })
 
 watch(
-  () => [props.goal.side, props.goal.period, props.goal.elapsedMs, props.goal.scorer, props.goal.assist, props.goal.description],
+  () => [props.goal.side, props.goal.period, props.goal.elapsedMs, props.goal.scorerPlayerId, props.goal.scorer, props.goal.assistPlayerId, props.goal.assist, props.goal.description],
   () => {
     if (!hasDraft.value) loadSavedValues()
   },
 )
+
+watch(() => draft.side, (side) => {
+  if (side === participation.value?.ownSide) return
+  if (draft.scorer.mode === 'squad') draft.scorer = { mode: 'manual', name: draft.scorer.name }
+  if (draft.assist.mode === 'squad') draft.assist = { mode: 'manual', name: draft.assist.name }
+})
 
 function discardChanges(): void {
   loadSavedValues()
@@ -84,26 +139,26 @@ function discardChanges(): void {
 
 async function save(): Promise<void> {
   if (!store.ready.value || store.saving.value) return
-  const parsedTime = parseMatchMinute(draft.time)
-  if (!parsedTime) {
-    timeError.value = 'Enter a minute from 1–90, or stoppage time such as 45+2.'
+  const currentMatch = match.value
+  if (!currentMatch) return
+  saveError.value = ''
+  timeError.value = ''
+  const prepared = prepareGoalEdit(currentMatch, props.goal.id, {
+    side: draft.side,
+    time: draft.time,
+    savedDisplayTime: savedDisplayTime.value,
+    scorer: draft.scorer,
+    assist: draft.assist,
+    description: draft.description,
+  })
+  if (!prepared.ok) {
+    if (prepared.field === 'time') timeError.value = prepared.error
+    else saveError.value = prepared.error
     return
   }
 
-  const editedGoal: GoalEvent = {
-    ...props.goal,
-    side: draft.side,
-    period: parsedTime.period,
-    elapsedMs: parsedTime.elapsedMs,
-    scorer: draft.scorer.trim(),
-    assist: draft.assist.trim(),
-    description: draft.description.trim(),
-  }
-  const currentMatch = match.value
-  if (!currentMatch) return
+  const editedGoal = prepared.goal
   const now = Date.now()
-  saveError.value = ''
-  timeError.value = ''
   try {
     await persistGoalEdit(currentMatch, editedGoal, store, now)
     loadSavedValues(editedGoal)
@@ -144,14 +199,24 @@ async function save(): Promise<void> {
           <span>Match minute</span>
           <input v-model="draft.time" name="time" autocomplete="off" aria-label="Match minute" :disabled="!store.ready.value || store.saving.value" required />
         </label>
-        <label>
-          <span>Scorer <small>Optional</small></span>
-          <input v-model="draft.scorer" name="scorer" autocomplete="off" placeholder="Add scorer" :disabled="!store.ready.value || store.saving.value" />
-        </label>
-        <label>
-          <span>Assist <small>Optional</small></span>
-          <input v-model="draft.assist" name="assist" autocomplete="off" placeholder="Add assist" :disabled="!store.ready.value || store.saving.value" />
-        </label>
+        <GoalPlayerField
+          role="scorer"
+          :value="draft.scorer"
+          :players="playerOptions"
+          :has-squad-choices="hasSquadChoices"
+          :disabled="!store.ready.value || store.saving.value"
+          :error="null"
+          @update="draft.scorer = $event"
+        />
+        <GoalPlayerField
+          role="assist"
+          :value="draft.assist"
+          :players="playerOptions"
+          :has-squad-choices="hasSquadChoices"
+          :disabled="!store.ready.value || store.saving.value"
+          :error="null"
+          @update="draft.assist = $event"
+        />
         <label class="description-field">
           <span>Description <small>Optional</small></span>
           <textarea v-model="draft.description" name="description" rows="3" placeholder="How it happened…" :disabled="!store.ready.value || store.saving.value"></textarea>

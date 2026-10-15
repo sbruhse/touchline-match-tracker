@@ -29,7 +29,7 @@ const emit = defineEmits<{
       <span class="match-header__phase clock-status">{{ phase }}</span>
     </div>
     <div class="match-header__scoreline" aria-label="Match score">
-      <strong id="match-heading" class="match-header__team match-header__team--home" :title="match.homeTeam">{{ match.homeTeam }}</strong>
+      <strong id="match-heading" class="match-header__team match-header__team--home" tabindex="-1" :title="match.homeTeam">{{ match.homeTeam }}</strong>
       <div class="match-header__score" aria-label="Score">
         <span data-testid="home-score">{{ homeScore }}</span>
         <span aria-hidden="true">–</span>
@@ -52,6 +52,7 @@ const emit = defineEmits<{
 .match-header__phase, .match-header__clock-state { color: #526156; font-size: 0.875rem; }
 .match-header__scoreline { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; margin: 4px 0; }
 .match-header__team { overflow-wrap: anywhere; font-size: clamp(1rem, 4vw, 1.3rem); line-height: 1.15; }
+.match-header__team:focus { border-radius: 2px; outline: 3px solid #91b83c; outline-offset: 4px; }
 .match-header__team--home { text-align: left; }
 .match-header__team--away { text-align: right; }
 .match-header__score { display: flex; align-items: center; gap: 8px; font-family: 'Space Grotesk', sans-serif; font-size: clamp(2rem, 8vw, 3rem); font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1; }
@@ -65,5 +66,25 @@ const emit = defineEmits<{
   .match-header { padding: 12px 22px; }
   .match-header__clockline { justify-content: space-between; }
   .match-header :deep(.clock-actions) { flex: 0 1 auto; }
+}
+
+@media (min-width: 680px) and (max-height: 500px) {
+  .match-header {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    grid-template-areas: 'topline scoreline' 'clockline clockline';
+    gap: 0 16px;
+    align-items: center;
+    padding: 4px 16px;
+  }
+
+  .match-header__topline { grid-area: topline; }
+  .match-header__scoreline { grid-area: scoreline; gap: 8px; margin: 0; }
+  .match-header__team { font-size: 0.9rem; line-height: 1.1; }
+  .match-header__score { gap: 4px; font-size: 1.75rem; }
+  .match-header__clockline { grid-area: clockline; flex-wrap: nowrap; gap: 10px; }
+  .match-header__minute { font-size: 1.1rem; }
+  .match-header :deep(.clock-actions) { flex: 0 1 auto; flex-wrap: nowrap; gap: 6px; }
+  .match-header :deep(.clock-primary), .match-header :deep(.secondary-button) { padding-inline: 10px; font-size: 0.8rem; }
 }
 </style>

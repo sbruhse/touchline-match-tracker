@@ -6,6 +6,8 @@ import {
   provideMatchStore,
   type GoalEvent,
   type Match,
+  type MatchJerseyAssignment,
+  type MatchParticipation,
   type MatchRepository,
   type MatchStore,
 } from '../../../entities/match'
@@ -14,12 +16,23 @@ import GoalEventEditor from './GoalEventEditor.vue'
 function fixtureGoal(): GoalEvent {
   return {
     id: 'goal-draft', side: 'home', period: 1, elapsedMs: 60_000,
-    scorer: '', assist: '', description: '', createdAt: 1_000,
+    scorerPlayerId: null, scorer: '', assistPlayerId: null, assist: '', description: '', createdAt: 1_000,
   }
 }
 
-async function mountEditor(options: { failNextSave?: boolean } = {}) {
-  const initial: Match = { ...createMatch('North City', 'South Town', 100, 'goal-draft-match'), goals: [fixtureGoal()] }
+async function mountEditor(options: {
+  failNextSave?: boolean
+  openInitially?: boolean
+  goal?: GoalEvent
+  participation?: MatchParticipation
+  jerseyAssignment?: MatchJerseyAssignment
+} = {}) {
+  const initial: Match = {
+    ...createMatch('North City', 'South Town', 100, 'goal-draft-match'),
+    goals: [options.goal ?? fixtureGoal()],
+    participation: options.participation ?? null,
+    jerseyAssignment: options.jerseyAssignment ?? null,
+  }
   const records = [structuredClone(initial)]
   let failNextSave = options.failNextSave ?? false
   const repository: MatchRepository = {
@@ -39,7 +52,7 @@ async function mountEditor(options: { failNextSave?: boolean } = {}) {
   }
 
   let store!: MatchStore
-  const open = ref(false)
+  const open = ref(options.openInitially ?? false)
   const Host = defineComponent({
     setup() {
       store = provideMatchStore(repository)
@@ -72,6 +85,13 @@ function setInput(name: string, value: string): HTMLInputElement {
   input.value = value
   input.dispatchEvent(new Event('input', { bubbles: true }))
   return input
+}
+
+function setSelect(name: string, value: string): HTMLSelectElement {
+  const select = document.querySelector<HTMLSelectElement>(`[name="${name}"]`)!
+  select.value = value
+  select.dispatchEvent(new Event('change', { bubbles: true }))
+  return select
 }
 
 describe('GoalEventEditor', () => {
@@ -130,10 +150,11 @@ describe('GoalEventEditor', () => {
   })
 
   it('preserves a draft when an unrelated match change commits', async () => {
-    const { wrapper, store } = await mountEditor()
+    const { wrapper, store, records } = await mountEditor()
     try {
       await wrapper.get('.goal-editor-launcher').trigger('click')
       await flushPromises()
+      const originalGoal = records[0].goals[0]
       setInput('scorer', 'Still drafting')
       const current = store.matches.value[0]
       await store.persist({
@@ -144,6 +165,233 @@ describe('GoalEventEditor', () => {
       await flushPromises()
 
       expect((document.querySelector('[name="scorer"]') as HTMLInputElement).value).toBe('Still drafting')
+      submitEditor()
+      await flushPromises()
+      expect(records[0].clock.elapsedMs).toBe(90_000)
+      expect(records[0].goals[0]).toMatchObject({
+        id: originalGoal.id,
+        createdAt: originalGoal.createdAt,
+        period: originalGoal.period,
+        elapsedMs: originalGoal.elapsedMs,
+        scorer: 'Still drafting',
+      })
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('initializes saved linked and name-only roles when mounted already open', async () => {
+    const participation: MatchParticipation = {
+      ownSide: 'home',
+      squad: [
+        { playerId: 'alex-id', nameSnapshot: 'Alex Morgan' },
+        { playerId: 'alex-bench-id', nameSnapshot: 'Alex Morgan' },
+        { playerId: 'lee-id', nameSnapshot: 'Lee Taylor' },
+      ],
+      starterIds: ['alex-id'],
+      substitutions: [],
+    }
+    const jerseyAssignment: MatchJerseyAssignment = {
+      setId: 'set-id',
+      setNameSnapshot: 'Match jerseys',
+      rows: [
+        { playerId: 'alex-id', jersey: { jerseyId: 'shirt-7', number: 7, size: 'M', ownerPlayerId: null } },
+        { playerId: 'alex-bench-id', jersey: { jerseyId: 'shirt-0', number: 0, size: 'S', ownerPlayerId: null } },
+        { playerId: 'lee-id', jersey: null },
+      ],
+    }
+    const goal = {
+      ...fixtureGoal(),
+      scorerPlayerId: 'alex-id',
+      scorer: 'Alex match snapshot',
+      assist: 'Alex Morgan',
+    }
+    const { wrapper } = await mountEditor({
+      openInitially: true,
+      goal,
+      participation,
+      jerseyAssignment,
+    })
+    try {
+      await flushPromises()
+      expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+      expect((document.querySelector('[name="scorer"]') as HTMLSelectElement).value).toBe('alex-id')
+      expect(document.querySelector('.selected-player-label')?.textContent).toBe('#7 Alex Morgan · alexi')
+      expect((document.querySelector('[name="assist"]') as HTMLSelectElement).value).toBe('__manual_name__')
+      expect((document.querySelector('#goal-assist-name') as HTMLInputElement).value).toBe('Alex Morgan')
+      const options = [...document.querySelectorAll('#goal-scorer-player option')]
+      expect(options.map((option) => option.textContent)).toContain('#0 Alex Morgan · alexb')
+      expect(options.some((option) => option.getAttribute('value') === 'lee-id')).toBe(true)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('clears linked roles to manual names when the goal changes to the opponent', async () => {
+    const participation: MatchParticipation = {
+      ownSide: 'home',
+      squad: [{ playerId: 'alex-id', nameSnapshot: 'Alex Match Snapshot' }],
+      starterIds: ['alex-id'],
+      substitutions: [],
+    }
+    const goal = { ...fixtureGoal(), scorerPlayerId: 'alex-id', scorer: 'Alex Match Snapshot' }
+    const { wrapper } = await mountEditor({ goal, participation })
+    try {
+      await wrapper.get('.goal-editor-launcher').trigger('click')
+      await flushPromises()
+      const side = document.querySelector<HTMLSelectElement>('[name="side"]')!
+      side.value = 'away'
+      side.dispatchEvent(new Event('change', { bubbles: true }))
+      await flushPromises()
+
+      const scorer = document.querySelector<HTMLInputElement>('#goal-scorer-name')
+      expect(scorer?.value).toBe('Alex Match Snapshot')
+      expect(document.querySelector('#goal-scorer-player')).toBeNull()
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('saves, replaces, manually converts, and clears role links from the saved squad only', async () => {
+    const participation: MatchParticipation = {
+      ownSide: 'home',
+      squad: [
+        { playerId: 'alex-id', nameSnapshot: 'Alex Morgan' },
+        { playerId: 'alex-bench-id', nameSnapshot: 'Alex Morgan' },
+        { playerId: 'lee-id', nameSnapshot: 'Lee Taylor' },
+      ],
+      starterIds: ['alex-id'],
+      substitutions: [],
+    }
+    const { wrapper, records } = await mountEditor({ participation })
+    const choose = (name: string, value: string) => {
+      const select = document.querySelector<HTMLSelectElement>(`[name="${name}"]`)!
+      select.value = value
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+
+    try {
+      await wrapper.get('.goal-editor-launcher').trigger('click')
+      await flushPromises()
+      expect(document.querySelectorAll('#goal-scorer-player option')).toHaveLength(5)
+      choose('scorer', 'alex-id')
+      choose('assist', 'lee-id')
+      submitEditor()
+      await flushPromises()
+      expect(records[0].goals[0]).toMatchObject({
+        scorerPlayerId: 'alex-id', scorer: 'Alex Morgan',
+        assistPlayerId: 'lee-id', assist: 'Lee Taylor',
+      })
+
+      await wrapper.get('.goal-editor-launcher').trigger('click')
+      await flushPromises()
+      choose('scorer', 'alex-bench-id')
+      choose('assist', '__manual_name__')
+      await flushPromises()
+      const assistInput = document.querySelector<HTMLInputElement>('#goal-assist-name')!
+      assistInput.value = 'Guest provider'
+      assistInput.dispatchEvent(new Event('input', { bubbles: true }))
+      submitEditor()
+      await flushPromises()
+      expect(records[0].goals[0]).toMatchObject({
+        scorerPlayerId: 'alex-bench-id', scorer: 'Alex Morgan',
+        assistPlayerId: null, assist: 'Guest provider',
+      })
+
+      await wrapper.get('.goal-editor-launcher').trigger('click')
+      await flushPromises()
+      choose('scorer', '')
+      choose('assist', '')
+      submitEditor()
+      await flushPromises()
+      expect(records[0].goals[0]).toMatchObject({
+        scorerPlayerId: null, scorer: '', assistPlayerId: null, assist: '',
+      })
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('preserves the exact committed goal time when saving details without changing its minute', async () => {
+    const goal = { ...fixtureGoal(), period: 2 as const, elapsedMs: 2_846_789, createdAt: 6_543 }
+    const { wrapper, records } = await mountEditor({ goal })
+    try {
+      await wrapper.get('.goal-editor-launcher').trigger('click')
+      await flushPromises()
+      setInput('scorer', 'Recorded scorer')
+      submitEditor()
+      await flushPromises()
+
+      expect(records[0].goals[0]).toMatchObject({
+        id: goal.id,
+        createdAt: goal.createdAt,
+        period: 2,
+        elapsedMs: goal.elapsedMs,
+        scorer: 'Recorded scorer',
+      })
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('rejects a now-stale selected identity against the latest committed squad and retains it for correction', async () => {
+    const participation: MatchParticipation = {
+      ownSide: 'home',
+      squad: [
+        { playerId: 'alex-id', nameSnapshot: 'Alex Match Snapshot' },
+        { playerId: 'sam-id', nameSnapshot: 'Sam Match Snapshot' },
+      ],
+      starterIds: ['alex-id'],
+      substitutions: [],
+    }
+    const { wrapper, store, records } = await mountEditor({ participation })
+    try {
+      await wrapper.get('.goal-editor-launcher').trigger('click')
+      await flushPromises()
+      setSelect('scorer', 'alex-id')
+      const latest = store.matches.value[0]
+      await store.persist({
+        ...latest,
+        participation: { ...participation, squad: [participation.squad[1]], starterIds: ['sam-id'] },
+        updatedAt: latest.updatedAt + 1,
+      })
+      await flushPromises()
+
+      submitEditor()
+      await flushPromises()
+      expect(document.querySelector('[role="alert"]')?.textContent).toContain('belong to the saved match squad')
+      expect((document.querySelector('[name="scorer"]') as HTMLSelectElement).value).toBe('alex-id')
+      expect(records[0].goals[0].scorerPlayerId).toBeNull()
+      expect(store.matches.value[0].goals[0].scorerPlayerId).toBeNull()
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('keeps exact linked selections through a failed save and publishes only after a successful retry', async () => {
+    const participation: MatchParticipation = {
+      ownSide: 'home',
+      squad: [{ playerId: 'alex-id', nameSnapshot: 'Alex Match Snapshot' }],
+      starterIds: ['alex-id'],
+      substitutions: [],
+    }
+    const { wrapper, store, records } = await mountEditor({ failNextSave: true, participation })
+    try {
+      await wrapper.get('.goal-editor-launcher').trigger('click')
+      await flushPromises()
+      setSelect('scorer', 'alex-id')
+      submitEditor()
+      await flushPromises()
+
+      expect(document.querySelector('[role="alert"]')?.textContent).toContain('Disk is temporarily unavailable')
+      expect((document.querySelector('[name="scorer"]') as HTMLSelectElement).value).toBe('alex-id')
+      expect(records[0].goals[0].scorerPlayerId).toBeNull()
+      expect(store.matches.value[0].goals[0].scorerPlayerId).toBeNull()
+
+      submitEditor()
+      await flushPromises()
+      expect(records[0].goals[0]).toMatchObject({ scorerPlayerId: 'alex-id', scorer: 'Alex Match Snapshot' })
+      expect(document.querySelector('[role="dialog"]')).toBeNull()
     } finally {
       wrapper.unmount()
     }

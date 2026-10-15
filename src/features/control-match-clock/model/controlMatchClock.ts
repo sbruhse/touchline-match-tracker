@@ -19,6 +19,11 @@ export async function applyMatchClockAction(
 ): Promise<void> {
   let clock
   const completedPeriodElapsedMs = { ...match.completedPeriodElapsedMs }
+  const firstKickoffAt = action === 'resume'
+    && match.clock.period === 1
+    && match.clock.status === 'not-started'
+    ? now
+    : match.firstKickoffAt
   switch (action) {
     case 'resume': clock = resumeClock(match.clock, now); break
     case 'pause': clock = pauseClock(match.clock, now); break
@@ -41,6 +46,7 @@ export async function applyMatchClockAction(
     ...match,
     clock,
     completedPeriodElapsedMs,
+    firstKickoffAt,
     goals: match.goals.map((goal) => ({ ...goal })),
     updatedAt: now,
   })

@@ -25,13 +25,23 @@ class MemoryStorage implements PlayerStorageLike {
   }
 }
 
-async function mountFeature(initialMatch: Match, players: ReturnType<typeof createPlayer>[]) {
+async function mountFeature(
+  initialMatch: Match,
+  players: ReturnType<typeof createPlayer>[],
+  options: { presentation?: 'standalone' | 'workflow'; failedWrites?: number; failedPlayerLoads?: number } = {},
+) {
   const records = [structuredClone(initialMatch)]
   const savedSnapshots: Match[] = []
+  let failedWrites = options.failedWrites ?? 0
+  let failedPlayerLoads = options.failedPlayerLoads ?? 0
   const matchRepository: MatchRepository = {
     listMatches: async () => structuredClone(records),
     getMatch: async (id) => records.find((match) => match.id === id),
     async saveMatch(match) {
+      if (failedWrites > 0) {
+        failedWrites -= 1
+        throw new Error('temporary match write failure')
+      }
       const snapshot = structuredClone(match)
       savedSnapshots.push(snapshot)
       const index = records.findIndex((saved) => saved.id === match.id)
@@ -43,6 +53,14 @@ async function mountFeature(initialMatch: Match, players: ReturnType<typeof crea
   const storage = new MemoryStorage()
   const playerRepository = createPlayerRepository({ storage })
   await playerRepository.savePlayers(players)
+  const listPlayers = playerRepository.listPlayers.bind(playerRepository)
+  playerRepository.listPlayers = async () => {
+    if (failedPlayerLoads > 0) {
+      failedPlayerLoads -= 1
+      throw new Error('player directory temporarily unavailable')
+    }
+    return listPlayers()
+  }
 
   let matchStore!: MatchStore
   let playerStore!: ReturnType<typeof providePlayerStore>
@@ -50,11 +68,14 @@ async function mountFeature(initialMatch: Match, players: ReturnType<typeof crea
     setup() {
       matchStore = provideMatchStore(matchRepository)
       playerStore = providePlayerStore(playerRepository)
-      return () => h(ConfigureMatchSquad, { matchId: initialMatch.id })
+       return () => h(ConfigureMatchSquad, {
+         matchId: initialMatch.id,
+         presentation: options.presentation ?? 'standalone',
+       })
     },
   })
   const wrapper = mount(Host)
-  await Promise.all([matchStore.load(), playerStore.load()])
+  await Promise.allSettled([matchStore.load(), playerStore.load()])
   await flushPromises()
   return { wrapper, matchStore, playerStore, records, savedSnapshots }
 }
@@ -148,7 +169,7 @@ describe('ConfigureMatchSquad', () => {
     }
   })
 
-  it('shows blank-setup feedback and cannot begin an invalid or duplicate squad', async () => {
+    it('shows blank-setup feedback and cannot begin an invalid or duplicate squad', async () => {
     const match = createMatch('North City', 'South Town', 100, 'invalid-squad-match')
     const alex = createPlayer('Alex', 100, 'alex-id')
     const { wrapper, records } = await mountFeature(match, [alex])
@@ -172,6 +193,132 @@ describe('ConfigureMatchSquad', () => {
       })
     } finally {
       wrapper.unmount()
+    }
+  })
+
+  it('opens directly in workflow mode, restores committed choices, and emits saved only after a successful commit', async () => {
+    const match = {
+      ...createMatch('North City', 'South Town', 100, 'workflow-squad-match'),
+      participation: {
+        ownSide: 'away' as const,
+        squad: [{ playerId: 'alex-id', nameSnapshot: 'Alex Match Snapshot' }],
+        starterIds: ['alex-id'],
+        substitutions: [],
+      },
+    }
+    const alex = createPlayer('Alex', 100, 'alex-id')
+    const { wrapper, savedSnapshots } = await mountFeature(match, [alex], { presentation: 'workflow', failedWrites: 1 })
+    try {
+      const feature = wrapper.getComponent(ConfigureMatchSquad)
+      expect(wrapper.find('.squad-form').exists()).toBe(true)
+      expect((wrapper.get('[name="own-side"][value="away"]').element as HTMLInputElement).checked).toBe(true)
+      expect((wrapper.get('[aria-label="Include Alex Match Snapshot in match squad"]').element as HTMLInputElement).checked).toBe(true)
+      expect((wrapper.get('[aria-label="Select Alex Match Snapshot as a starter"]').element as HTMLInputElement).checked).toBe(true)
+      expect(feature.emitted('saved')).toBeUndefined()
+
+      await wrapper.get('[name="own-side"][value="home"]').setValue()
+      await wrapper.get('.squad-form').trigger('submit')
+      await flushPromises()
+      expect(wrapper.text()).toContain('temporary match write failure')
+      expect((wrapper.get('[aria-label="Select Alex Match Snapshot as a starter"]').element as HTMLInputElement).checked).toBe(true)
+      expect(savedSnapshots).toHaveLength(0)
+      expect(feature.emitted('saved')).toBeUndefined()
+
+      await wrapper.get('.squad-form').trigger('submit')
+      await flushPromises()
+      expect(savedSnapshots).toHaveLength(1)
+      expect(feature.emitted('saved')).toEqual([[match.id]])
+      expect(wrapper.find('.squad-form').exists()).toBe(true)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('keeps skip/keep distinct from the explicit committed disable action', async () => {
+    const match = {
+      ...createMatch('North City', 'South Town', 100, 'workflow-disable-match'),
+      participation: {
+        ownSide: 'home' as const,
+        squad: [{ playerId: 'alex-id', nameSnapshot: 'Alex' }],
+        starterIds: ['alex-id'],
+        substitutions: [],
+      },
+    }
+    const { wrapper, records, savedSnapshots } = await mountFeature(
+      match,
+      [createPlayer('Alex', 100, 'alex-id')],
+      { presentation: 'workflow' },
+    )
+    try {
+      const feature = wrapper.getComponent(ConfigureMatchSquad)
+      await wrapper.get('.squad-form .quiet-button').trigger('click')
+      expect(feature.emitted('navigationIntent')).toEqual([['keep']])
+      expect(savedSnapshots).toHaveLength(0)
+      expect(records[0].participation).not.toBeNull()
+
+      await wrapper.get('.workflow-squad-actions button').trigger('click')
+      await flushPromises()
+      expect(savedSnapshots).toHaveLength(1)
+      expect(records[0].participation).toBeNull()
+      expect(feature.emitted('saved')).toEqual([[match.id]])
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('distinguishes an empty directory from a load failure, retries, and keeps saved squads usable without source data', async () => {
+    const empty = await mountFeature(
+      createMatch('North City', 'South Town', 100, 'empty-workflow-directory'),
+      [],
+      { presentation: 'workflow' },
+    )
+    try {
+      expect(empty.wrapper.text()).toContain('No players are registered yet.')
+      expect(empty.wrapper.text()).toContain('Add players in My players')
+      expect(empty.wrapper.find('.squad-form').exists()).toBe(false)
+      expect(empty.wrapper.findAll('button').some((button) => button.text() === 'Skip player tracking')).toBe(true)
+      expect(empty.wrapper.text()).not.toContain('directory is unavailable')
+    } finally {
+      empty.wrapper.unmount()
+    }
+
+    const retry = await mountFeature(
+      createMatch('North City', 'South Town', 100, 'retry-workflow-directory'),
+      [createPlayer('Alex', 100, 'alex-id')],
+      { presentation: 'workflow', failedPlayerLoads: 1 },
+    )
+    try {
+      expect(retry.wrapper.text()).toContain('player directory is unavailable')
+      expect(retry.wrapper.text()).not.toContain('No players are registered yet.')
+      expect(retry.wrapper.findAll('button').some((button) => button.text() === 'Skip player tracking')).toBe(true)
+      await retry.wrapper.get('.squad-setup button.secondary-button').trigger('click')
+      await flushPromises()
+      expect(retry.playerStore.ready.value).toBe(true)
+      expect(retry.wrapper.find('.squad-form').exists()).toBe(true)
+      expect(retry.wrapper.get('[aria-label="Include Alex in match squad"]')).toBeTruthy()
+    } finally {
+      retry.wrapper.unmount()
+    }
+
+    const savedSetup: Match = {
+      ...createMatch('North City', 'South Town', 100, 'saved-workflow-without-directory'),
+      participation: {
+        ownSide: 'home',
+        squad: [{ playerId: 'alex-id', nameSnapshot: 'Alex Snapshot' }],
+        starterIds: ['alex-id'],
+        substitutions: [],
+      },
+    }
+    const saved = await mountFeature(savedSetup, [], { presentation: 'workflow', failedPlayerLoads: 1 })
+    try {
+      expect(saved.wrapper.text()).toContain('Saved squad choices remain available')
+      expect(saved.wrapper.get('[aria-label="Include Alex Snapshot in match squad"]')).toBeTruthy()
+      await saved.wrapper.get('.squad-form .quiet-button').trigger('click')
+      expect(saved.savedSnapshots).toHaveLength(0)
+      expect(saved.records[0].participation).toEqual(savedSetup.participation)
+      expect(saved.wrapper.getComponent(ConfigureMatchSquad).emitted('navigationIntent')).toEqual([['keep']])
+    } finally {
+      saved.wrapper.unmount()
     }
   })
 

@@ -17,12 +17,25 @@ function trackedMatch(overrides: Partial<Match> = {}): Match {
     starterIds: ['alex'],
     substitutions: [],
   }
-  return {
+  const match: Match = {
     ...base,
     clock: { period: 1, elapsedMs: 1_000, status: 'running', startedAt: 10_000 },
     participation,
+    firstKickoffAt: 9_500,
+    jerseyAssignment: {
+      setId: 'set-blue',
+      setNameSnapshot: 'Blue',
+      rows: [
+        { playerId: 'alex', jersey: { jerseyId: 'jersey-alex', number: 7, size: 'M', ownerPlayerId: null } },
+        { playerId: 'sam', jersey: { jerseyId: 'jersey-sam', number: 8, size: 'M', ownerPlayerId: 'sam' } },
+        { playerId: 'jordan', jersey: { jerseyId: 'jersey-jordan', number: 9, size: 'L', ownerPlayerId: null } },
+      ],
+    },
     ...overrides,
   }
+  if (overrides.participation === null) match.jerseyAssignment = null
+  if (overrides.clock?.status === 'not-started') match.firstKickoffAt = null
+  return match
 }
 
 describe('record-substitution model', () => {
@@ -79,7 +92,12 @@ describe('record-substitution model', () => {
   })
 
   it('preserves the captured time, assigns stable sequence, and permits re-entry', () => {
-    const match = trackedMatch()
+    const attributedGoal = {
+      id: 'attributed-goal', side: 'home' as const, period: 1 as const, elapsedMs: 123_456,
+      scorerPlayerId: 'alex', scorer: 'Alex snapshot',
+      assistPlayerId: 'sam', assist: 'Sam snapshot', description: '', createdAt: 100,
+    }
+    const match = trackedMatch({ goals: [attributedGoal] })
     const firstOccurrence = prepareSubstitutionOccurrence(match, 12_000)
     expect(firstOccurrence.valid).toBe(true)
     if (!firstOccurrence.valid) return
@@ -91,6 +109,15 @@ describe('record-substitution model', () => {
     expect(match.participation?.substitutions).toEqual([])
 
     const afterFirst = first.match
+    expect(afterFirst.firstKickoffAt).toBe(match.firstKickoffAt)
+    expect(afterFirst.jerseyAssignment).toEqual(match.jerseyAssignment)
+    expect(afterFirst.goals).toEqual([attributedGoal])
+    expect(afterFirst.participation).toMatchObject({
+      ownSide: match.participation?.ownSide,
+      squad: match.participation?.squad,
+      starterIds: match.participation?.starterIds,
+      substitutions: [{ id: 'first' }],
+    })
     const secondOccurrence = prepareSubstitutionOccurrence(afterFirst, 40_000)
     expect(secondOccurrence.valid).toBe(true)
     if (!secondOccurrence.valid) return
@@ -99,6 +126,9 @@ describe('record-substitution model', () => {
     if (second.valid) {
       expect(second.event.sequence).toBe(1)
       expect(second.match.participation?.substitutions.map((event) => event.id)).toEqual(['first', 'second'])
+      expect(second.match.firstKickoffAt).toBe(match.firstKickoffAt)
+      expect(second.match.jerseyAssignment).toEqual(match.jerseyAssignment)
+      expect(second.match.goals).toEqual([attributedGoal])
     }
   })
 

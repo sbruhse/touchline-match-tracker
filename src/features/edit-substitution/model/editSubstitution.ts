@@ -9,6 +9,7 @@ import {
   type SubstitutionCorrection,
   type SubstitutionEvent,
   type SubstitutionHistoryCandidateResult,
+  copyMatchSnapshot,
 } from '../../../entities/match'
 
 export type SubstitutionEditResult =
@@ -55,17 +56,7 @@ function finishCandidate(
     valid: true,
     events: events.map((event) => ({ ...event })),
     calculation: validation,
-    match: {
-      id: match.id,
-      homeTeam: match.homeTeam,
-      awayTeam: match.awayTeam,
-      createdAt: match.createdAt,
-      updatedAt: now,
-      clock: { ...match.clock },
-      goals: match.goals.map((goal) => ({ ...goal })),
-      participation,
-      completedPeriodElapsedMs: { ...match.completedPeriodElapsedMs },
-    },
+    match: Object.assign(copyMatchSnapshot(match), { updatedAt: now, participation }),
   }
 }
 

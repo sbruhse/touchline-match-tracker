@@ -1,21 +1,26 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import {
   getMatchMinute,
   scoreFor,
   useMatchStore,
   useMatchTime,
 } from '../../../entities/match'
-import { ConfigureMatchSquad } from '../../../features/configure-match-squad'
+import { usePlayerStore } from '../../../entities/player'
 import type { CommittedGoalResult } from '../../../features/record-goal'
 import { MatchLineupWidget } from '../../../widgets/match-lineup'
 import MatchTimeline from './components/MatchTimeline.vue'
 import MatchActionBar from './components/MatchActionBar.vue'
 import MatchHeader from './components/MatchHeader.vue'
+import PreKickoffPreparationSummary from './components/PreKickoffPreparationSummary.vue'
 
 const props = defineProps<{ matchId: string }>()
-const emit = defineEmits<{ back: [] }>()
+const emit = defineEmits<{
+  back: []
+  prepare: [matchId: string]
+}>()
 const store = useMatchStore()
+const playerStore = usePlayerStore()
 const match = computed(() => store.matches.value.find((item) => item.id === props.matchId) ?? null)
 const score = computed(() => match.value ? scoreFor(match.value) : { home: 0, away: 0 })
 const { now, refresh } = useMatchTime()
@@ -39,6 +44,8 @@ const clockStatusLabel = computed(() => {
 const periodLabel = computed(() => match.value?.clock.period === 2 ? 'SECOND HALF' : 'FIRST HALF')
 const canSubstitute = computed(() => Boolean(match.value?.participation
   && ['running', 'paused', 'halftime'].includes(match.value.clock.status)))
+const canPrepare = computed(() => match.value?.clock.period === 1 && match.value.clock.status === 'not-started')
+const ownerPlayers = computed(() => playerStore.players.value.map(({ id, name }) => ({ id, name })))
 const matchSaveFeedback = computed(() => {
   if (focusedGoalEditorId.value || focusedSubstitutionEditor.value) return null
   if (store.saving.value) return { type: 'saving', text: 'Saving changes…' }
@@ -50,6 +57,11 @@ const matchSaveFeedback = computed(() => {
   return null
 })
 
+onMounted(async () => {
+  await nextTick()
+  document.getElementById('match-heading')?.focus()
+})
+
 watch(() => match.value?.clock.status, (status, previousStatus) => {
   if (previousStatus === 'not-started' && status !== 'not-started') selectedPanel.value = 'events'
 })
@@ -57,11 +69,12 @@ watch(() => match.value?.clock.status, (status, previousStatus) => {
 function handleGoalRecorded(result: CommittedGoalResult): void {
   refresh()
   recentlySavedGoal.value = result
+  requestedGoalId.value = result.goalId
 }
 
 function handleGoalEditorOpened(goalId: string): void {
   focusedGoalEditorId.value = goalId
-  recentlySavedGoal.value = null
+  if (requestedGoalId.value !== goalId) recentlySavedGoal.value = null
 }
 
 function handleClockUpdated(): void {
@@ -150,6 +163,9 @@ function onActionBarResize(height: number): void {
           @click="setSelectedPanel('player-times')"
         >Player times</button>
       </div>
+    </header>
+
+    <div class="match-workspace-body">
       <div
         v-if="matchSaveFeedback"
         class="save-feedback match-save-feedback"
@@ -160,10 +176,16 @@ function onActionBarResize(height: number): void {
         <span>{{ matchSaveFeedback.text }}</span>
         <button v-if="matchSaveFeedback.type === 'goal'" type="button" @click="openRecentlySavedGoal">Add details</button>
       </div>
-    </header>
 
-    <div class="match-workspace-body">
-      <ConfigureMatchSquad v-if="match.clock.status === 'not-started'" :match-id="match.id" />
+      <section v-if="canPrepare" class="preparation-entry" aria-label="Optional match preparation">
+        <PreKickoffPreparationSummary :match="match" :owner-players="ownerPlayers" />
+        <button
+          class="prepare-match-button"
+          type="button"
+          :disabled="store.saving.value"
+          @click="emit('prepare', match.id)"
+        >Review or edit preparation</button>
+      </section>
 
       <section
         id="events-panel"
@@ -192,7 +214,9 @@ function onActionBarResize(height: number): void {
         tabindex="0"
         v-show="selectedPanel === 'player-times'"
       >
-        <MatchLineupWidget v-if="match.participation" :match-id="match.id" />
+        <template v-if="match.participation">
+          <MatchLineupWidget :match-id="match.id" />
+        </template>
         <div v-else class="untracked-player-times">
           <h2>Player times unavailable</h2>
           <p v-if="match.clock.status === 'not-started'">
@@ -228,6 +252,10 @@ function onActionBarResize(height: number): void {
 .match-panel-tabs button[aria-selected='true'] { color: #204d38; background: #edf3e8; border-color: #d6e1d1; }
 .match-panel-tabs button:focus-visible, .match-panel:focus-visible { outline: 3px solid #5f8d2e; outline-offset: 2px; }
 .match-workspace-body { padding: 8px 16px 24px; }
+.preparation-entry { display: grid; gap: 0.6rem; margin: 0 0 1rem; }
+.prepare-match-button { min-height: 48px; padding: 0 14px; border: 1px solid #cbd7ca; border-radius: 0.45rem; background: #edf3e8; color: #204d38; font: inherit; font-size: 0.92rem; font-weight: 700; text-align: left; }
+.prepare-match-button:focus-visible { outline: 3px solid #91b83c; outline-offset: 2px; }
+.prepare-match-button:disabled { cursor: not-allowed; opacity: 0.55; }
 .match-panel { min-width: 0; }
 .untracked-player-times { padding: 24px 4px; }
 .untracked-player-times h2 { margin: 0 0 8px; font-size: 1.2rem; }
@@ -238,6 +266,10 @@ function onActionBarResize(height: number): void {
 .ready-card-footer { min-height: 3.9rem; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; border-top: 1px solid #e4e8e0; }
 .ready-card-footer p { margin: 0; color: #526156; font-size: 0.875rem; }
 .ready-badge { color: #526156; font-size: 0.75rem; white-space: nowrap; }
+
+@media (display-mode: standalone) {
+  .match-sticky-header { top: env(safe-area-inset-top); }
+}
 
 @media (min-width: 680px) {
   .match-workspace-body { padding-right: 24px; padding-left: 24px; }

@@ -11,13 +11,23 @@ export {
   startSecondHalf,
 } from './model/clock'
 export { createGoalEvent } from './model/goals'
+export { reconcileGoalAttributions, validateGoalAttribution } from './model/goalAttribution'
+export { resolveHistoricalJerseyNumbers } from './model/jerseyNumberHistory'
+export {
+  getAcceptedJerseyNumber,
+  reconcileMatchJerseyAssignment,
+  validateMatchJerseyAssignment,
+} from './model/matchJerseyAssignment'
+export { copyMatchSnapshot } from './model/matchSnapshot'
 export { aggregatePlayerParticipation } from './model/playerStatistics'
+export { aggregatePlayerGoalStatistics } from './model/playerGoalStatistics'
 export type {
   ExcludedMatchReason,
   ExcludedPlayerMatch,
   PlayerMatchBreakdown,
   PlayerParticipationStatistics,
 } from './model/playerStatistics'
+export type { PlayerGoalStatistics } from './model/playerGoalStatistics'
 export {
   calculateParticipationPlayingTime,
   correctSubstitutionHistory,
@@ -45,6 +55,9 @@ export type {
   ClockState,
   GoalEvent,
   Match,
+  MatchJerseyAssignment,
+  MatchJerseyAssignmentRow,
+  MatchJerseySnapshot,
   MatchParticipation,
   MatchPeriod,
   MatchRecord,

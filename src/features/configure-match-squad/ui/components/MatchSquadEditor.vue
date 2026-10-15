@@ -13,6 +13,8 @@ defineProps<{
   disabled: boolean
   saving: boolean
   error: string | null
+  saveLabel: string
+  cancelLabel: string
 }>()
 const emit = defineEmits<{
   updateOwnSide: [side: MatchSide]
@@ -52,8 +54,8 @@ const emit = defineEmits<{
 
     <p v-if="error" class="squad-error" role="alert" aria-live="assertive">{{ error }}</p>
     <div class="squad-form-actions">
-      <button class="primary-button" type="submit" :disabled="disabled">Save match squad</button>
-      <button class="quiet-button" type="button" :disabled="disabled" @click="emit('cancel')">Cancel</button>
+      <button class="primary-button" type="submit" :disabled="disabled">{{ saveLabel }}</button>
+      <button class="quiet-button" type="button" :disabled="disabled" @click="emit('cancel')">{{ cancelLabel }}</button>
     </div>
     <p v-if="saving" class="squad-state" role="status" aria-live="polite">Saving match squad…</p>
   </form>
@@ -62,15 +64,15 @@ const emit = defineEmits<{
 <style scoped>
 .squad-form { display: grid; gap: 1rem; }
 .side-choice, .player-choice-list { min-width: 0; margin: 0; padding: 0; border: 0; }
-.side-choice legend, .player-choice-list legend { margin-bottom: 0.45rem; color: #33483a; font-size: 0.75rem; font-weight: 700; }
+.side-choice legend, .player-choice-list legend { margin-bottom: 0.45rem; color: #17251d; font-size: 0.95rem; font-weight: 700; }
 .side-choice { display: flex; flex-wrap: wrap; gap: 0.55rem; }
 .side-choice legend { flex-basis: 100%; }
-.side-choice label { display: flex; align-items: center; gap: 0.4rem; min-height: 2.35rem; padding: 0 0.65rem; border: 1px solid #dfe6dc; border-radius: 0.35rem; background: #fff; color: #536157; font-size: 0.7rem; }
+.side-choice label { display: flex; align-items: center; gap: 0.5rem; min-height: 3rem; padding: 0.4rem 0.75rem; border: 1px solid #dfe8e0; border-radius: 0.35rem; background: #fff; color: #33483a; font-size: 0.92rem; }
 .side-choice input { accent-color: var(--green); }
-.fieldset-help { margin: -0.2rem 0 0.5rem; color: #69766c; font-size: 0.74rem; line-height: 1.5; }
-.squad-error { margin: 0; padding: 0.65rem 0.75rem; border-radius: 0.3rem; background: #f8e9e6; color: #8a3d34; font-size: 0.74rem; }
+.fieldset-help { margin: -0.2rem 0 0.5rem; color: #526156; font-size: 0.9rem; line-height: 1.5; }
+.squad-error { margin: 0; padding: 0.65rem 0.75rem; border-radius: 0.3rem; background: #f8e9e6; color: #78271f; font-size: 0.9rem; }
 .squad-form-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.7rem; }
-.primary-button, .quiet-button { min-height: 2.5rem; padding: 0 0.8rem; border-radius: 0.35rem; font-size: 0.72rem; font-weight: 600; }
+.primary-button, .quiet-button { min-height: 3rem; padding: 0.45rem 0.8rem; border-radius: 0.35rem; font-size: 0.9rem; font-weight: 650; }
 .primary-button { border: 0; background: var(--green); color: #fff; }
 .quiet-button { border: 1px solid transparent; background: transparent; color: #718075; }
 .primary-button:disabled, .quiet-button:disabled { cursor: not-allowed; opacity: 0.5; }

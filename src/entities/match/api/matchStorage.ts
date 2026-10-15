@@ -3,6 +3,8 @@ import type {
   CompletedPeriodElapsedMs,
   GoalEvent,
   Match,
+  MatchJerseyAssignment,
+  MatchJerseySnapshot,
   MatchParticipation,
   MatchPeriod,
   MatchSide,
@@ -10,6 +12,9 @@ import type {
   MatchSquadPlayer,
   SubstitutionEvent,
 } from '../model/match'
+import { copyMatchSnapshot } from '../model/matchSnapshot'
+import { validateMatchJerseyAssignment } from '../model/matchJerseyAssignment'
+import { validateGoalAttribution } from '../model/goalAttribution'
 
 export const MATCH_DATABASE_NAME = 'touchline'
 export const MATCH_DATABASE_VERSION = 1
@@ -83,15 +88,24 @@ function parseClock(value: unknown): ClockState {
   }
 }
 
-function parseGoal(value: unknown, index: number): GoalEvent {
+function parseGoal(value: unknown, index: number, version: number | undefined): GoalEvent {
   const label = `goals[${index}]`
   const goal = requiredRecord(value, label)
+  if (version === 4 && (!Object.hasOwn(goal, 'scorerPlayerId') || !Object.hasOwn(goal, 'assistPlayerId'))) {
+    throw new Error(`Invalid version-4 match record: ${label} must explicitly include scorerPlayerId and assistPlayerId.`)
+  }
   return {
     id: stringValue(goal.id, `${label}.id`),
     side: matchSide(goal.side, `${label}.side`),
     period: matchPeriod(goal.period, `${label}.period`),
     elapsedMs: finiteNumber(goal.elapsedMs, `${label}.elapsedMs`),
+    scorerPlayerId: version === 4
+      ? goal.scorerPlayerId === null ? null : stringValue(goal.scorerPlayerId, `${label}.scorerPlayerId`)
+      : null,
     scorer: stringValue(goal.scorer, `${label}.scorer`),
+    assistPlayerId: version === 4
+      ? goal.assistPlayerId === null ? null : stringValue(goal.assistPlayerId, `${label}.assistPlayerId`)
+      : null,
     assist: stringValue(goal.assist, `${label}.assist`),
     description: stringValue(goal.description, `${label}.description`),
     createdAt: finiteNumber(goal.createdAt, `${label}.createdAt`),
@@ -138,6 +152,39 @@ function parseParticipation(value: unknown): MatchParticipation | null {
   }
 }
 
+function parseJerseyAssignment(value: unknown): MatchJerseyAssignment | null {
+  if (value === null) return null
+  const assignment = requiredRecord(value, 'jerseyAssignment')
+  if (!Array.isArray(assignment.rows)) {
+    throw new Error('Invalid match record: jerseyAssignment.rows must be an array.')
+  }
+  return {
+    setId: stringValue(assignment.setId, 'jerseyAssignment.setId'),
+    setNameSnapshot: stringValue(assignment.setNameSnapshot, 'jerseyAssignment.setNameSnapshot'),
+    rows: assignment.rows.map((value, index) => {
+      const label = `jerseyAssignment.rows[${index}]`
+      const row = requiredRecord(value, label)
+      let jersey: MatchJerseySnapshot | null = null
+      if (row.jersey !== null) {
+        const storedJersey = requiredRecord(row.jersey, `${label}.jersey`)
+        const number = finiteNumber(storedJersey.number, `${label}.jersey.number`)
+        if (!Number.isSafeInteger(number) || number < 0) {
+          throw new Error(`Invalid match record: ${label}.jersey.number must be a nonnegative whole number.`)
+        }
+        jersey = {
+          jerseyId: stringValue(storedJersey.jerseyId, `${label}.jersey.jerseyId`),
+          number,
+          size: stringValue(storedJersey.size, `${label}.jersey.size`),
+          ownerPlayerId: storedJersey.ownerPlayerId === null
+            ? null
+            : stringValue(storedJersey.ownerPlayerId, `${label}.jersey.ownerPlayerId`),
+        }
+      }
+      return { playerId: stringValue(row.playerId, `${label}.playerId`), jersey }
+    }),
+  }
+}
+
 function parseCompletedPeriods(value: unknown): CompletedPeriodElapsedMs {
   const durations = requiredRecord(value, 'completedPeriodElapsedMs')
   const parseDuration = (period: MatchPeriod): number | null => {
@@ -162,7 +209,10 @@ function inferCompletedPeriods(clock: ClockState): CompletedPeriodElapsedMs {
   return { 1: null, 2: null }
 }
 
-function parseMatchCore(record: StoredRecord): Omit<Match, 'participation' | 'completedPeriodElapsedMs'> {
+function parseMatchCore(
+  record: StoredRecord,
+  version: number | undefined,
+): Omit<Match, 'participation' | 'completedPeriodElapsedMs' | 'firstKickoffAt' | 'jerseyAssignment'> {
   if (!Array.isArray(record.goals)) throw new Error('Invalid match record: goals must be an array.')
   return {
     id: stringValue(record.id, 'id'),
@@ -171,18 +221,47 @@ function parseMatchCore(record: StoredRecord): Omit<Match, 'participation' | 'co
     createdAt: finiteNumber(record.createdAt, 'createdAt'),
     updatedAt: finiteNumber(record.updatedAt, 'updatedAt'),
     clock: parseClock(record.clock),
-    goals: record.goals.map(parseGoal),
+    goals: record.goals.map((goal, index) => parseGoal(goal, index, version)),
   }
 }
 
 function normalizeStoredRecord(value: unknown): Match {
   const record = requiredRecord(value, 'root')
   const version = record.recordVersion
-  if (version !== undefined && version !== 1 && version !== 2) {
+  if (version !== undefined && version !== 1 && version !== 2 && version !== 3 && version !== 4) {
     throw new Error(`Unsupported match record version: ${String(version)}.`)
   }
 
-  const core = parseMatchCore(record)
+  const core = parseMatchCore(record, version)
+  if (version === 3 || version === 4) {
+    if (!Object.hasOwn(record, 'participation') || !Object.hasOwn(record, 'completedPeriodElapsedMs')
+      || !Object.hasOwn(record, 'firstKickoffAt') || !Object.hasOwn(record, 'jerseyAssignment')) {
+      throw new Error(`Invalid version-${version} match record: participation, completed period durations, first kickoff, and jersey assignment are required.`)
+    }
+    const participation = parseParticipation(record.participation)
+    const firstKickoffAt = record.firstKickoffAt === null
+      ? null
+      : finiteNumber(record.firstKickoffAt, 'firstKickoffAt')
+    if (firstKickoffAt !== null && core.clock.status === 'not-started') {
+      throw new Error(`Invalid version-${version} match record: firstKickoffAt requires a match that has started.`)
+    }
+    const jerseyAssignment = parseJerseyAssignment(record.jerseyAssignment)
+    const assignmentError = validateMatchJerseyAssignment(participation, jerseyAssignment)
+    if (assignmentError) throw new Error(`Invalid version-${version} match record: ${assignmentError}`)
+    if (version === 4) {
+      for (const goal of core.goals) {
+        const attributionError = validateGoalAttribution(goal, participation)
+        if (attributionError) throw new Error(`Invalid version-4 match record: ${attributionError}`)
+      }
+    }
+    return {
+      ...core,
+      participation,
+      completedPeriodElapsedMs: parseCompletedPeriods(record.completedPeriodElapsedMs),
+      firstKickoffAt,
+      jerseyAssignment,
+    }
+  }
   if (version === 2) {
     if (!Object.hasOwn(record, 'participation') || !Object.hasOwn(record, 'completedPeriodElapsedMs')) {
       throw new Error('Invalid version-2 match record: participation and completed period durations are required.')
@@ -190,6 +269,8 @@ function normalizeStoredRecord(value: unknown): Match {
     return {
       ...core,
       participation: parseParticipation(record.participation),
+      firstKickoffAt: null,
+      jerseyAssignment: null,
       completedPeriodElapsedMs: parseCompletedPeriods(record.completedPeriodElapsedMs),
     }
   }
@@ -210,6 +291,8 @@ function normalizeStoredRecord(value: unknown): Match {
   return {
     ...core,
     participation: record.participation === undefined ? null : parseParticipation(record.participation),
+    firstKickoffAt: null,
+    jerseyAssignment: null,
     completedPeriodElapsedMs: {
       1: savedDurations[1] ?? inferred[1],
       2: savedDurations[2] ?? inferred[2],
@@ -218,57 +301,22 @@ function normalizeStoredRecord(value: unknown): Match {
 }
 
 function plainMatchSnapshot(match: Match): Match {
-  return {
-    id: match.id,
-    homeTeam: match.homeTeam,
-    awayTeam: match.awayTeam,
-    createdAt: match.createdAt,
-    updatedAt: match.updatedAt,
-    clock: {
-      period: match.clock.period,
-      elapsedMs: match.clock.elapsedMs,
-      status: match.clock.status,
-      startedAt: match.clock.startedAt,
-    },
-    goals: match.goals.map((goal) => ({
-      id: goal.id,
-      side: goal.side,
-      period: goal.period,
-      elapsedMs: goal.elapsedMs,
-      scorer: goal.scorer,
-      assist: goal.assist,
-      description: goal.description,
-      createdAt: goal.createdAt,
-    })),
-    participation: match.participation ? {
-      ownSide: match.participation.ownSide,
-      squad: match.participation.squad.map((player) => ({ ...player })),
-      starterIds: [...match.participation.starterIds],
-      substitutions: match.participation.substitutions.map((event) => ({ ...event })),
-    } : null,
-    completedPeriodElapsedMs: { ...match.completedPeriodElapsedMs },
-  }
+  return copyMatchSnapshot(match)
 }
 
-function version2Record(match: Match, existingValue: unknown): StoredRecord {
+function version4Record(match: Match, existingValue: unknown): StoredRecord {
   const snapshot = plainMatchSnapshot(match)
-  if (existingValue === undefined) return { ...snapshot, recordVersion: 2 }
+  const candidate: StoredRecord = { ...snapshot, recordVersion: 4 }
+  normalizeStoredRecord(candidate)
+  if (existingValue === undefined) return candidate
 
   normalizeStoredRecord(existingValue)
   const existing = requiredRecord(existingValue, 'existing record')
-  if (existing.recordVersion === 2) {
-    if (existing.legacyV1Backup === undefined) return { ...snapshot, recordVersion: 2 }
-    return {
-      ...snapshot,
-      recordVersion: 2,
-      legacyV1Backup: structuredClone(existing.legacyV1Backup),
-    }
+  if (existing.recordVersion === undefined || existing.recordVersion === 1) {
+    return { ...candidate, legacyV1Backup: structuredClone(existingValue) }
   }
-  return {
-    ...snapshot,
-    recordVersion: 2,
-    legacyV1Backup: structuredClone(existingValue),
-  }
+  if (!Object.hasOwn(existing, 'legacyV1Backup')) return candidate
+  return { ...candidate, legacyV1Backup: structuredClone(existing.legacyV1Backup) }
 }
 
 function runTransaction<T>(
@@ -324,7 +372,7 @@ function runTransaction<T>(
   })
 }
 
-function writeVersion2Record(database: IDBDatabase, match: Match): Promise<void> {
+function writeVersion4Record(database: IDBDatabase, match: Match): Promise<void> {
   return new Promise((resolve, reject) => {
     let transaction: IDBTransaction
     try {
@@ -363,7 +411,7 @@ function writeVersion2Record(database: IDBDatabase, match: Match): Promise<void>
       }
       getRequest.onsuccess = () => {
         try {
-          const record = version2Record(match, getRequest.result)
+          const record = version4Record(match, getRequest.result)
           const putRequest = store.put(record)
           putRequested = true
           putRequest.onerror = () => {
@@ -466,7 +514,7 @@ export function createMatchRepository(options: MatchRepositoryOptions = {}): Mat
     },
     async saveMatch(match) {
       const database = await openDatabase()
-      await writeVersion2Record(database, plainMatchSnapshot(match))
+      await writeVersion4Record(database, plainMatchSnapshot(match))
     },
     close() {
       closed = true

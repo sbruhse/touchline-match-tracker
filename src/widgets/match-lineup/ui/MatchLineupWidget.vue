@@ -4,6 +4,7 @@ import type { DeepReadonly } from 'vue'
 import {
   calculateParticipationPlayingTime,
   formatPlayingTime,
+  getAcceptedJerseyNumber,
   getElapsedMs,
   useMatchStore,
   useMatchTime,
@@ -72,9 +73,14 @@ const playerRows = computed<LineupPlayerRow[]>(() => {
   return participation.squad.map(({ playerId }) => {
     const time = result.playerTimes.find((item) => item.playerId === playerId)
     const elapsedMs = time?.elapsedMs ?? 0
+    const acceptedNumber = getAcceptedJerseyNumber(match.value!.jerseyAssignment, playerId)
     return {
       playerId,
       label: labelsById.value.get(playerId) ?? playerId,
+      jerseyNumber: typeof acceptedNumber === 'number' ? acceptedNumber : null,
+      jerseyAssignmentState: acceptedNumber === undefined
+        ? 'unprepared' as const
+        : acceptedNumber === null ? 'unassigned' as const : 'assigned' as const,
       elapsedMs,
       playingTime: formatPlayingTime(elapsedMs),
       liveContribution: time?.liveContribution ?? false,

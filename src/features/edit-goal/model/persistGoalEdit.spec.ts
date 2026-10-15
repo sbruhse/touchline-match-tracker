@@ -16,13 +16,31 @@ describe('persistGoalEdit', () => {
     const now = 2_500
     const firstGoal: GoalEvent = {
       id: 'goal-one', side: 'home', period: 1, elapsedMs: 1_000,
-      scorer: '', assist: '', description: '', createdAt: 1_000,
+      scorerPlayerId: null, scorer: '', assistPlayerId: null, assist: '', description: '', createdAt: 1_000,
     }
     const otherGoal: GoalEvent = {
       id: 'goal-two', side: 'away', period: 1, elapsedMs: 2_000,
-      scorer: 'B. Player', assist: '', description: 'A header', createdAt: 2_000,
+      scorerPlayerId: null, scorer: 'B. Player', assistPlayerId: null, assist: '', description: 'A header', createdAt: 2_000,
     }
-    const match: Match = { ...createMatch('North City', 'South Town', 100, 'edited-match'), goals: [firstGoal, otherGoal] }
+    const match: Match = {
+      ...createMatch('North City', 'South Town', 100, 'edited-match'),
+      goals: [firstGoal, otherGoal],
+      firstKickoffAt: 1_900,
+      participation: {
+        ownSide: 'home',
+        squad: [{ playerId: 'player-alex', nameSnapshot: 'Alex' }],
+        starterIds: ['player-alex'],
+        substitutions: [],
+      },
+      jerseyAssignment: {
+        setId: 'set-blue',
+        setNameSnapshot: 'Blue',
+        rows: [{
+          playerId: 'player-alex',
+          jersey: { jerseyId: 'jersey-zero', number: 0, size: 'M', ownerPlayerId: null },
+        }],
+      },
+    }
     const committed = deferred<Match>()
     let snapshot: DeepReadonly<Match> | undefined
     const persist = vi.fn((value: DeepReadonly<Match>) => {
@@ -35,6 +53,8 @@ describe('persistGoalEdit', () => {
     const action = persistGoalEdit(match, editedGoal, store, now)
     expect(snapshot).toMatchObject({
       updatedAt: now,
+      firstKickoffAt: match.firstKickoffAt,
+      jerseyAssignment: match.jerseyAssignment,
       goals: [editedGoal, otherGoal],
     })
     let completed = false
